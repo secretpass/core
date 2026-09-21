@@ -1,0 +1,47 @@
+[package]
+name = "web"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+# This library is used exclusively in the browser as part of the cloud for on device encryption and decryption
+crate-type = ["cdylib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom_v2 = { package = "getrandom", version = "0.2", features = ["js"] }
+
+[dependencies]
+chrono = { version = "0.4.45", features = ["wasm-bindgen"] }
+serde_json = "1.0.151"
+serde-wasm-bindgen = "0.6.5"
+wasm-bindgen = { version = "0.2.128" }
+base64 = "0.23.1"
+serde = { version = "1.0.229", features = ["derive"] }
+p256 = "0.13"
+sha2 = "0.11.0"
+uuid = { version = "1.26.1", features = ["v4", "js"] }
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
+ciborium = "0.2.2"
+coset = "0.4.2"
+
+
+[dependencies.web-sys]
+version = "0.3.105"
+features = [
+    "CredentialsContainer",
+    "Credential",
+    "Navigator",
+    "Window",
+    "CredentialRequestOptions",
+    "CredentialCreationOptions",
+    "PublicKeyCredential",
+    "PublicKeyCredentialCreationOptions",
+    "PublicKeyCredentialRpEntity",
+    "PublicKeyCredentialUserEntity",
+    "AuthenticatorAttestationResponse",
+    "AuthenticationExtensionsClientOutputs",
+    "AuthenticationExtensionsClientInputs",
+    "AuthenticationExtensionsPrfInputs",
+    "AuthenticationExtensionsPrfOutputs",
+    "AuthenticationExtensionsPrfValues",
+]
