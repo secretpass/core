@@ -5,6 +5,7 @@ pub use fips203::ml_kem_768::{
 };
 use fips203::traits::KeyGen;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use wasm_bindgen::prelude::wasm_bindgen;
 pub use x25519_dalek::{PublicKey as EccPublicKey, StaticSecret as EccPrivateKey};
 
@@ -14,6 +15,16 @@ pub enum EncryptionAlgorithm {
     ECC,    // X25519
     KEM,    // ML-KEM-768
     Hybrid, // Encrypts with both algorithms
+}
+
+impl fmt::Display for EncryptionAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            EncryptionAlgorithm::ECC => write!(f, "ECC"),
+            EncryptionAlgorithm::KEM => write!(f, "KEM"),
+            EncryptionAlgorithm::Hybrid => write!(f, "Hybrid"),
+        }
+    }
 }
 
 #[derive(Clone, Deserialize)]

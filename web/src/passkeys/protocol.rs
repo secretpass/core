@@ -6,9 +6,10 @@ use coset::{CborSerializable, CoseKey, Label};
 use p256::EncodedPoint;
 use p256::ecdsa::signature::Verifier;
 use p256::ecdsa::{Signature, VerifyingKey};
-use secretpass_core::Passkey;
+use secretpass_core::{Passkey, PasskeyResidency, SecretpassProject};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use wasm_bindgen::throw_str;
 
 const CHALLENGE_LEN: usize = 32;
 
@@ -30,6 +31,20 @@ struct AuthData {
     rp_id_hash: Vec<u8>,
     flags: u8,
     credential_data: Option<Vec<u8>>,
+}
+
+impl AuthData {
+    fn verify_user_presence(&self) -> bool {
+        throw_str("User must be present for authentication")
+    }
+
+    fn verify_residency(&self, project: &SecretpassProject) {
+        let not_synced = self.flags & 0x08 == 0 && self.flags & 0x10 == 0;
+        if not_synced || project.residency == PasskeyResidency::SyncedAllowed {
+            return;
+        }
+        throw_str("Synced passkeys are not allowed")
+    }
 }
 
 fn generate_challenge() -> Result<String> {
@@ -85,13 +100,6 @@ fn verify_rp_id_hash(hash: &[u8]) -> Result<()> {
     let expected = Sha256::digest(CONFIG.rp_id.as_bytes());
     if hash != expected.as_ref() as &[u8] {
         return Err(PasskeyError::RpIdHashMismatch);
-    }
-    Ok(())
-}
-
-fn verify_user_present(flags: u8) -> Result<()> {
-    if (flags & 0x01) == 0 {
-        return Err(PasskeyError::UserPresentFlagNotSet);
     }
     Ok(())
 }
@@ -156,6 +164,7 @@ fn verify_p256_signature(
 /// Returns the options that must be sent to the WebAuthn client (`navigator.credentials.create`).
 /// It also saves the registration session state to the provided `store`.
 pub async fn start_registration(
+    project: &SecretpassProject,
     user_id: &str,
     username: &str,
     display_name: &str,
@@ -165,7 +174,7 @@ pub async fn start_registration(
 
     let options = PasskeyCreationOptions {
         rp: RpEntity {
-            name: CONFIG.rp_name.to_string(),
+            name: format!("{} - {}", CONFIG.rp_name, project.name),
             id: CONFIG.rp_id.to_string(),
         },
         user: UserEntity {
@@ -197,13 +206,13 @@ pub async fn start_registration(
 /// Validates the client response against the stored challenge and RP configuration.
 /// On success, a new [`Passkey`](crate::types::Passkey) is created via the `store`.
 pub async fn finish_registration(
-    user_id: &str,
-    challenge: &str,
+    project: &SecretpassProject,
+    options: &PasskeyCreationOptions,
     response: RegistrationResponse,
 ) -> Result<Passkey> {
     verify_client_data(
         &response.response.client_data_json,
-        challenge,
+        options.challenge.as_str(),
         "webauthn.create",
     )?;
 
@@ -230,8 +239,9 @@ pub async fn finish_registration(
 
     // Verify authData
     let auth_data = parse_auth_data(auth_data_bytes)?;
+    auth_data.verify_residency(project);
+    auth_data.verify_user_presence();
     verify_rp_id_hash(&auth_data.rp_id_hash)?;
-    verify_user_present(auth_data.flags)?;
 
     // Extract credential
     let cred_bytes = auth_data
@@ -247,13 +257,12 @@ pub async fn finish_registration(
     let cred_id_b64 = BASE64_URL_SAFE_NO_PAD.encode(cred_id);
     let pub_key_b64 = BASE64_URL_SAFE_NO_PAD.encode(pub_key_cbor);
 
-    let now = chrono::Utc::now().timestamp_millis();
     let passkey = Passkey {
-        user_id: user_id.to_string(),
-        cred_id: cred_id_b64.to_string(),
+        id: cred_id_b64.to_string(),
         public_key: pub_key_b64,
-        created_at: now,
-        last_used_at: now,
+        user_id: options.user.id.clone(),
+        user_name: options.user.name.clone(),
+        created_at: chrono::Utc::now().to_rfc3339(),
     };
 
     Ok(passkey)
@@ -282,6 +291,7 @@ pub fn start_login() -> Result<PasskeyRequestOptions> {
 /// Validates the client response, signature, and counter.
 /// On success, returns the `user_id` of the authenticated user and updates the counter in the `store`.
 pub async fn finish_login(
+    project: &SecretpassProject,
     passkey: &Passkey,
     challenge: &str,
     response: LoginResponse,
@@ -300,8 +310,9 @@ pub async fn finish_login(
     let auth_data_bytes = BASE64_URL_SAFE_NO_PAD.decode(&response.response.authenticator_data)?;
 
     let auth_data = parse_auth_data(&auth_data_bytes)?;
+    auth_data.verify_residency(project);
+    auth_data.verify_user_presence();
     verify_rp_id_hash(&auth_data.rp_id_hash)?;
-    verify_user_present(auth_data.flags)?;
 
     // Verify user handle if present
     if let Some(ref uh_b64) = response.response.user_handle {

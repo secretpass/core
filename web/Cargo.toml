@@ -47,4 +47,8 @@ features = [
     "AuthenticationExtensionsPrfOutputs",
     "AuthenticationExtensionsPrfValues",
     "UserVerificationRequirement",
+    "ResidentKeyRequirement",
+    "AuthenticatorSelectionCriteria",
+    "AttestationConveyancePreference",
+    "AuthenticatorAttachment",
 ]

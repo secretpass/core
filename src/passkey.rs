@@ -25,9 +25,18 @@ pub struct StoredPublicKey {
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Passkey {
-    pub user_id: String,
-    pub cred_id: String,
+    pub id: String,
     pub public_key: String, // Base64url-encoded COSE key
-    pub created_at: i64,
-    pub last_used_at: i64,
+    pub user_id: String,
+    pub user_name: String,
+    pub created_at: String,
+}
+
+impl Passkey {
+    pub fn prf_salt(&self) -> String {
+        format!(
+            "{}-{}-{}-{}-{}",
+            self.id, self.user_id, self.user_name, self.public_key, self.created_at
+        )
+    }
 }

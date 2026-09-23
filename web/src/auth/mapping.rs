@@ -42,7 +42,6 @@ fn assert_prf_enabled(outputs: AuthenticationExtensionsClientOutputs) {
 }
 
 pub fn map_browser_passkey_registration_response(
-    name: String,
     pk_credential: PublicKeyCredential,
 ) -> RegistrationResponse {
     let ext_outputs = pk_credential.get_client_extension_results();
@@ -68,7 +67,6 @@ pub fn map_browser_passkey_registration_response(
         id: pk_credential.id(),
         raw_id: js_array_buffer_to_string(pk_credential.raw_id(), "Error parsing passkey raw ID"),
         type_: pk_credential.type_(),
-        name,
         response,
     }
 }
@@ -143,8 +141,12 @@ pub fn u8_array_to_js(buffer: &[u8]) -> Uint8Array {
     Uint8Array::new_from_slice(&buffer)
 }
 
+pub fn u8_vec_to_js(buffer: Vec<u8>) -> Uint8Array {
+    Uint8Array::new_from_slice(&buffer)
+}
+
 pub fn allowed_credentials(passkey: &Passkey) -> JsValue {
-    let id = Uint8Array::new_from_slice(passkey.cred_id.as_bytes());
+    let id = Uint8Array::new_from_slice(passkey.id.as_bytes());
 
     let object = JsObject::new();
     JsReflect::set(

@@ -1,7 +1,7 @@
 use crate::passkeys::types::PrfResults;
 use secretpass_core::{
-    EncryptionAlgorithm, Passkey, PrivateKey, PrivateKeySeed, PublicKey, PublicKeyDto,
-    PublicKeyType, StoredPublicKey,
+    Passkey, PrivateKey, PrivateKeySeed, PublicKey, PublicKeyDto, PublicKeyType, SecretpassProject,
+    StoredPublicKey,
 };
 use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -30,9 +30,9 @@ impl PublicKeyJson {
 }
 
 impl SecureSession {
-    pub fn new(passkey: Passkey, algorithm: EncryptionAlgorithm, prf_results: PrfResults) -> Self {
+    pub fn new(project: &SecretpassProject, passkey: Passkey, prf_results: PrfResults) -> Self {
         let seed = PrivateKeySeed {
-            algorithm,
+            algorithm: project.algorithm,
             first: prf_results.first,
             second: prf_results.second,
         };

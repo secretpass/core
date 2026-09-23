@@ -94,7 +94,6 @@ pub struct RegistrationResponse {
     #[serde(rename = "type")]
     pub type_: String,
     pub response: AttestationResponse,
-    pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
