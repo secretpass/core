@@ -1,0 +1,8 @@
+[build]
+rustflags = ["--cfg=web_sys_unstable_apis"]
+rustdocflags = ["--cfg=web_sys_unstable_apis"]
+
+[env]
+WEBAUTH_RP_ID = ""
+WEBAUTH_RP_ENTITY = ""
+WEBAUTH_RP_ORIGIN = ""

@@ -1,22 +1,24 @@
-use fips203::traits::{Encaps, SerDes};
 use crate::keys::derive::{EccPublicKey, KemPublicKey};
-use serde::{Deserialize, Serialize};
-use aes_gcm::{Aes256Gcm, Nonce, aead::{Aead, KeyInit }};
+use crate::utils::get_global_rng;
+use aes_gcm::{
+    Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit},
+};
+use fips203::traits::{Encaps, SerDes};
 use rand::TryRng;
+use serde::{Deserialize, Serialize};
 use x25519_dalek::StaticSecret;
-use crate::utils::{get_global_rng};
-
 
 #[derive(Clone, Serialize)]
 pub struct PublicKeyDto {
-    kem: Option<String>,
-    ecc: Option<String>,
+    pub kem: Option<String>,
+    pub ecc: Option<String>,
 }
 
 #[derive(Clone)]
 pub struct PublicKey {
     ecc: Option<EccPublicKey>,
-    kem: Option<KemPublicKey>
+    kem: Option<KemPublicKey>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -24,17 +26,29 @@ pub struct EncryptedPackage {
     pub ecc_public_key: Option<Vec<u8>>,
     pub kem_ciphertext: Option<Vec<u8>>,
     pub nonce: [u8; 12],
-    pub payload: Vec<u8>
+    pub payload: Vec<u8>,
 }
 
 impl EncryptedPackage {
     pub fn ecc_public_key(&self) -> [u8; 32] {
-        let key_bytes: [u8; 32] = self.ecc_public_key.clone().unwrap().as_slice().try_into().unwrap();
+        let key_bytes: [u8; 32] = self
+            .ecc_public_key
+            .clone()
+            .unwrap()
+            .as_slice()
+            .try_into()
+            .unwrap();
         key_bytes
     }
 
     pub fn kem_ciphertext(&self) -> [u8; 1088] {
-        let key_bytes: [u8; 1088] = self.kem_ciphertext.clone().unwrap().as_slice().try_into().unwrap();
+        let key_bytes: [u8; 1088] = self
+            .kem_ciphertext
+            .clone()
+            .unwrap()
+            .as_slice()
+            .try_into()
+            .unwrap();
         key_bytes
     }
 }
@@ -47,8 +61,8 @@ impl PublicKey {
                 let key_bytes: [u8; 1184] = bytes.as_slice().try_into()?;
                 let key = KemPublicKey::try_from_bytes(key_bytes).unwrap();
                 Some(key)
-            },
-            _ => None
+            }
+            _ => None,
         };
 
         let ecc = match dto.ecc {
@@ -57,37 +71,28 @@ impl PublicKey {
                 let key_bytes: [u8; 32] = bytes.as_slice().try_into()?;
                 let key = EccPublicKey::from(key_bytes);
                 Some(key)
-            },
+            }
             None => None,
         };
 
-        Ok(Self {
-            kem,
-            ecc
-        })
+        Ok(Self { kem, ecc })
     }
 
     pub fn from_keys(kem: Option<KemPublicKey>, ecc: Option<EccPublicKey>) -> Self {
-        Self {
-            kem,
-            ecc,
-        }
+        Self { kem, ecc }
     }
 
     pub fn to_dto(&self) -> PublicKeyDto {
-        let ecc = match &self.ecc {
-            Some(value) => Some(hex::encode(value.clone().to_bytes())),
-            None => None
-        };
-        let kem = match &self.kem {
-            Some(value) => Some(hex::encode(value.clone().into_bytes())),
-            None => None
-        };
+        let ecc = self
+            .ecc
+            .as_ref()
+            .map(|value| hex::encode(value.clone().to_bytes()));
+        let kem = self
+            .kem
+            .as_ref()
+            .map(|value| hex::encode(value.clone().into_bytes()));
 
-        PublicKeyDto {
-            ecc,
-            kem,
-        }
+        PublicKeyDto { ecc, kem }
     }
 
     pub fn encrypt(&self, payload: Vec<u8>) -> anyhow::Result<Vec<u8>> {
@@ -108,7 +113,7 @@ impl PublicKey {
             ecc_public_key,
             kem_ciphertext,
             nonce: nonce_bytes,
-            payload
+            payload,
         };
 
         let encrypted_payload = rmp_serde::to_vec(&encrypted_package)?;
@@ -118,7 +123,7 @@ impl PublicKey {
 
     fn get_ecc_aes_keys(&self) -> (Option<Vec<u8>>, Option<[u8; 32]>) {
         if self.ecc.is_none() {
-            return (None, None)
+            return (None, None);
         }
 
         let target_public_key = &self.ecc.unwrap();
@@ -128,21 +133,31 @@ impl PublicKey {
         let encryptor_public = EccPublicKey::from(&encryptor_secret);
         let shared_secret = encryptor_secret.diffie_hellman(&target_public_key);
 
-        (Some(encryptor_public.to_bytes().to_vec()), Some(shared_secret.to_bytes()))
+        (
+            Some(encryptor_public.to_bytes().to_vec()),
+            Some(shared_secret.to_bytes()),
+        )
     }
 
     fn get_kem_aes_keys(&self) -> (Option<Vec<u8>>, Option<[u8; 32]>) {
         if self.kem.is_none() {
-            return (None, None)
+            return (None, None);
         }
 
         let target_public_key = self.kem.clone().unwrap();
         let (shared_secret, ciphertext) = target_public_key.try_encaps().unwrap();
 
-        (Some(ciphertext.into_bytes().to_vec()), Some(shared_secret.into_bytes()))
+        (
+            Some(ciphertext.into_bytes().to_vec()),
+            Some(shared_secret.into_bytes()),
+        )
     }
 
-    fn aes_encrypt_payload(nonce: [u8; 12], shared_secret: [u8; 32], payload: &Vec<u8>) -> anyhow::Result<Vec<u8>> {
+    fn aes_encrypt_payload(
+        nonce: [u8; 12],
+        shared_secret: [u8; 32],
+        payload: &Vec<u8>,
+    ) -> anyhow::Result<Vec<u8>> {
         let nonce = Nonce::from(nonce);
         let cipher = Aes256Gcm::new_from_slice(&shared_secret)?;
 

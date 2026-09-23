@@ -1,44 +1,10 @@
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::JsValue;
-use wasm_bindgen::prelude::wasm_bindgen;
-use web_sys::js_sys::{Array as JsArray, Object as JsObject, Reflect as JsReflect, Uint8Array};
 
 #[derive(Debug, Clone)]
 pub struct PasskeyConfig {
     pub rp_id: &'static str,
     pub rp_name: &'static str,
     pub origin: &'static str,
-}
-
-#[wasm_bindgen(getter_with_clone)]
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Passkey {
-    pub user_id: String,
-    pub cred_id: String,
-    pub public_key: String, // Base64url-encoded COSE key
-    pub name: String,
-    pub created_at: i64,
-    pub last_used_at: i64,
-}
-
-impl Passkey {
-    pub fn allowed_credentials(&self) -> JsValue {
-        let id = Uint8Array::new_from_slice(self.cred_id.as_bytes());
-
-        let object = JsObject::new();
-        JsReflect::set(
-            &object,
-            &JsValue::from_str("type"),
-            &JsValue::from_str("public-key"),
-        )
-        .unwrap();
-        JsReflect::set(&object, &JsValue::from_str("id"), &id).unwrap();
-
-        let credentials = JsArray::new();
-        credentials.push(&object);
-
-        JsValue::from(credentials)
-    }
 }
 
 // WebAuthn Protocol Types
@@ -139,11 +105,9 @@ pub struct AttestationResponse {
     pub attestation_object: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct PrfResults {
-    pub first: String,
-    pub second: String,
+    pub first: [u8; 32],
+    pub second: [u8; 32],
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -154,7 +118,6 @@ pub struct LoginResponse {
     #[serde(rename = "type")]
     pub type_: String,
     pub response: AssertionResponse,
-    pub prf_results: PrfResults,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

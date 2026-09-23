@@ -1,7 +1,11 @@
 use crate::auth::helpers::{get_credentials_container, parse_promise};
-use crate::auth::mapping::{map_browser_passkey_authentication, u8_array_to_js};
-use crate::passkeys::types::{LoginResponse, Passkey, PasskeyRequestOptions};
+use crate::auth::mapping::{
+    allowed_credentials, map_browser_passkey_authentication, u8_array_to_js,
+};
+use crate::passkeys::types::{LoginResponse, PasskeyRequestOptions, PrfResults};
 use crate::passkeys::{finish_login, start_login};
+use crate::session::SecureSession;
+use secretpass_core::{EncryptionAlgorithm, Passkey};
 use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::{
@@ -11,23 +15,24 @@ use web_sys::{
 };
 
 #[wasm_bindgen]
-pub async fn login_user(passkey: &Passkey) {
+pub async fn login_user(algorithm: EncryptionAlgorithm, passkey: Passkey) -> SecureSession {
     let login_options = start_login().expect_throw("Error starting login process");
 
     let challenge = login_options.challenge.clone();
 
-    let login_response = browser_user_login(passkey, login_options).await;
+    let (prf_results, login_response) = browser_user_login(&passkey, login_options).await;
 
-    let prf_results = finish_login(&passkey, challenge.as_str(), login_response)
+    finish_login(&passkey, challenge.as_str(), login_response)
         .await
         .expect_throw("Error finishing login process");
-    println!("PRF Results: {:?}", prf_results);
+
+    SecureSession::new(passkey, algorithm, prf_results)
 }
 
 async fn browser_user_login(
     passkey: &Passkey,
     login_options: PasskeyRequestOptions,
-) -> LoginResponse {
+) -> (PrfResults, LoginResponse) {
     let challenge = login_options.challenge.clone();
     let mut challenge_bytes: Vec<u8> = challenge.into_bytes();
 
@@ -44,7 +49,7 @@ async fn browser_user_login(
 
     let pk_options = PublicKeyCredentialRequestOptions::new_with_u8_slice(&mut challenge_bytes);
     pk_options.set_rp_id(login_options.rp_id.as_str());
-    pk_options.set_allow_credentials(&passkey.allowed_credentials());
+    pk_options.set_allow_credentials(&allowed_credentials(passkey));
     pk_options.set_user_verification(UserVerificationRequirement::Required);
     pk_options.set_extensions(&extensions);
 

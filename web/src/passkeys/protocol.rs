@@ -6,6 +6,7 @@ use coset::{CborSerializable, CoseKey, Label};
 use p256::EncodedPoint;
 use p256::ecdsa::signature::Verifier;
 use p256::ecdsa::{Signature, VerifyingKey};
+use secretpass_core::Passkey;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
@@ -250,7 +251,6 @@ pub async fn finish_registration(
     let passkey = Passkey {
         user_id: user_id.to_string(),
         cred_id: cred_id_b64.to_string(),
-        name: response.name,
         public_key: pub_key_b64,
         created_at: now,
         last_used_at: now,
@@ -285,7 +285,7 @@ pub async fn finish_login(
     passkey: &Passkey,
     challenge: &str,
     response: LoginResponse,
-) -> Result<PrfResults> {
+) -> Result<()> {
     // Parse clientDataJSON to retrieve the challenge for state lookup
     let client_data_bytes = BASE64_URL_SAFE_NO_PAD.decode(&response.response.client_data_json)?;
 
@@ -326,5 +326,5 @@ pub async fn finish_login(
     verify_p256_signature(&pub_key_bytes, &signed_data, &sig_bytes)?;
 
     // Return PRF results
-    Ok(response.prf_results)
+    Ok(())
 }

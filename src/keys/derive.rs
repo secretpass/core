@@ -5,8 +5,10 @@ pub use fips203::ml_kem_768::{
 };
 use fips203::traits::KeyGen;
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::wasm_bindgen;
 pub use x25519_dalek::{PublicKey as EccPublicKey, StaticSecret as EccPrivateKey};
 
+#[wasm_bindgen]
 #[derive(Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub enum EncryptionAlgorithm {
     ECC,    // X25519

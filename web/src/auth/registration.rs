@@ -1,15 +1,16 @@
 use crate::auth::mapping::map_browser_passkey_registration_response;
-use crate::passkeys::types::{Passkey, PasskeyCreationOptions, RegistrationResponse};
+use crate::passkeys::types::{PasskeyCreationOptions, RegistrationResponse};
 use crate::passkeys::{finish_registration, start_registration};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
 
 use crate::auth::helpers::{get_credentials_container, parse_promise};
+use secretpass_core::Passkey;
 use web_sys::js_sys::{Array as JsArray, Object as JsObject, Reflect as JsReflect};
 use web_sys::{
     AuthenticationExtensionsClientInputs, AuthenticationExtensionsPrfInputs,
-    CredentialCreationOptions, PublicKeyCredentialCreationOptions,
-    PublicKeyCredentialRpEntity, PublicKeyCredentialUserEntity,
+    CredentialCreationOptions, PublicKeyCredentialCreationOptions, PublicKeyCredentialRpEntity,
+    PublicKeyCredentialUserEntity,
 };
 
 #[wasm_bindgen]
