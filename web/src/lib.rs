@@ -1,3 +1,5 @@
-pub mod auth;
-mod constants;
-pub mod passkeys;
+mod auth;
+mod passkeys;
+
+pub use auth::login_user;
+pub use auth::register_user;

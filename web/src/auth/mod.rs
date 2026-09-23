@@ -1,3 +1,7 @@
+mod helpers;
+mod login;
 mod mapping;
-mod new;
-mod session;
+mod registration;
+
+pub use login::login_user;
+pub use registration::register_user;

@@ -6,25 +6,10 @@ use coset::{CborSerializable, CoseKey, Label};
 use p256::EncodedPoint;
 use p256::ecdsa::signature::Verifier;
 use p256::ecdsa::{Signature, VerifyingKey};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use uuid::Uuid;
 
-// Constants
 const CHALLENGE_LEN: usize = 32;
-
-// Internal helpers
-
-#[derive(Serialize, Deserialize)]
-struct RegState {
-    challenge: String,
-    user_id: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct LoginState {
-    challenge: String,
-}
 
 #[derive(Deserialize)]
 struct ClientData {
@@ -34,10 +19,15 @@ struct ClientData {
     type_: String,
 }
 
+static CONFIG: PasskeyConfig = PasskeyConfig {
+    rp_id: env!("WEBAUTH_RP_ID"),
+    rp_name: env!("WEBAUTH_RP_ENTITY"),
+    origin: env!("WEBAUTH_RP_ORIGIN"),
+};
+
 struct AuthData {
     rp_id_hash: Vec<u8>,
     flags: u8,
-    sign_count: u32,
     credential_data: Option<Vec<u8>>,
 }
 
@@ -52,7 +42,6 @@ fn generate_challenge() -> Result<String> {
 fn verify_client_data(
     client_data_b64: &str,
     expected_challenge: &str,
-    config: &PasskeyConfig,
     expected_type: &str,
 ) -> Result<(ClientData, Vec<u8>)> {
     let bytes = BASE64_URL_SAFE_NO_PAD.decode(client_data_b64)?;
@@ -61,9 +50,9 @@ fn verify_client_data(
     if data.challenge != expected_challenge {
         return Err(PasskeyError::InvalidChallenge);
     }
-    if data.origin != config.origin {
+    if data.origin != CONFIG.origin {
         return Err(PasskeyError::OriginMismatch {
-            expected: config.origin.clone(),
+            expected: CONFIG.origin.to_string(),
             got: data.origin,
         });
     }
@@ -79,7 +68,6 @@ fn parse_auth_data(raw: &[u8]) -> Result<AuthData> {
     }
     let rp_id_hash = raw[0..32].to_vec();
     let flags = raw[32];
-    let sign_count = u32::from_be_bytes(raw[33..37].try_into().unwrap());
     let credential_data = if (flags & 0x40) != 0 {
         Some(raw[37..].to_vec())
     } else {
@@ -88,13 +76,12 @@ fn parse_auth_data(raw: &[u8]) -> Result<AuthData> {
     Ok(AuthData {
         rp_id_hash,
         flags,
-        sign_count,
         credential_data,
     })
 }
 
-fn verify_rp_id_hash(hash: &[u8], config: &PasskeyConfig) -> Result<()> {
-    let expected = Sha256::digest(config.rp_id.as_bytes());
+fn verify_rp_id_hash(hash: &[u8]) -> Result<()> {
+    let expected = Sha256::digest(CONFIG.rp_id.as_bytes());
     if hash != expected.as_ref() as &[u8] {
         return Err(PasskeyError::RpIdHashMismatch);
     }
@@ -171,15 +158,14 @@ pub async fn start_registration(
     user_id: &str,
     username: &str,
     display_name: &str,
-    config: &PasskeyConfig,
-) -> Result<PublicKeyCredentialCreationOptions> {
+) -> Result<PasskeyCreationOptions> {
     let challenge = generate_challenge()?;
     let user_handle = BASE64_URL_SAFE_NO_PAD.encode(user_id.as_bytes());
 
-    let options = PublicKeyCredentialCreationOptions {
+    let options = PasskeyCreationOptions {
         rp: RpEntity {
-            name: config.rp_name.clone(),
-            id: config.rp_id.clone(),
+            name: CONFIG.rp_name.to_string(),
+            id: CONFIG.rp_id.to_string(),
         },
         user: UserEntity {
             id: user_handle,
@@ -208,21 +194,19 @@ pub async fn start_registration(
 /// Completes a passkey registration.
 ///
 /// Validates the client response against the stored challenge and RP configuration.
-/// On success, a new [`StoredPasskey`](crate::types::StoredPasskey) is created via the `store`.
+/// On success, a new [`Passkey`](crate::types::Passkey) is created via the `store`.
 pub async fn finish_registration(
     user_id: &str,
     challenge: &str,
-    config: &PasskeyConfig,
     response: RegistrationResponse,
-) -> Result<StoredPasskey> {
+) -> Result<Passkey> {
     verify_client_data(
         &response.response.client_data_json,
         challenge,
-        config,
         "webauthn.create",
     )?;
 
-    // 3. Parse attestation object (CBOR)
+    // Parse attestation object (CBOR)
     let att_bytes = BASE64_URL_SAFE_NO_PAD.decode(&response.response.attestation_object)?;
 
     let att_obj: Value = ciborium::from_reader(att_bytes.as_slice())
@@ -243,51 +227,30 @@ pub async fn finish_registration(
         .as_bytes()
         .ok_or_else(|| PasskeyError::InternalError("authData not bytes".into()))?;
 
-    // 4. Verify authData
+    // Verify authData
     let auth_data = parse_auth_data(auth_data_bytes)?;
-    verify_rp_id_hash(&auth_data.rp_id_hash, config)?;
+    verify_rp_id_hash(&auth_data.rp_id_hash)?;
     verify_user_present(auth_data.flags)?;
 
-    // 5. Extract credential
+    // Extract credential
     let cred_bytes = auth_data
         .credential_data
         .ok_or_else(|| PasskeyError::InternalError("Attested Credential Data missing".into()))?;
     let (cred_id, pub_key_cbor) = extract_credential(&cred_bytes)?;
 
-    // Extract AAGUID
-    let aaguid = if cred_bytes.len() >= 16 {
-        let aaguid_bytes: [u8; 16] = cred_bytes[0..16].try_into().unwrap();
-        let uuid = Uuid::from_bytes(aaguid_bytes);
-        if uuid.is_nil() {
-            None
-        } else {
-            Some(uuid.to_string())
-        }
-    } else {
-        None
-    };
-
     // Validate the public key parses
     CoseKey::from_slice(pub_key_cbor)
         .map_err(|e| PasskeyError::InternalError(format!("Invalid Public Key CBOR: {e}")))?;
 
-    // 6. Store credential
+    // Encode for storage
     let cred_id_b64 = BASE64_URL_SAFE_NO_PAD.encode(cred_id);
     let pub_key_b64 = BASE64_URL_SAFE_NO_PAD.encode(pub_key_cbor);
 
-    let passkey_name = match (response.name.as_deref(), aaguid) {
-        (Some(name), Some(id)) => format!("{}-{}", name, id),
-        (Some(name), None) => name.to_string(),
-        (None, Some(id)) => format!("Passkey-{}", id),
-        (None, None) => "Passkey".to_string(),
-    };
-
     let now = chrono::Utc::now().timestamp_millis();
-    let passkey = StoredPasskey {
+    let passkey = Passkey {
         user_id: user_id.to_string(),
         cred_id: cred_id_b64.to_string(),
-        name: passkey_name,
-        counter: auth_data.sign_count as i64,
+        name: response.name,
         public_key: pub_key_b64,
         created_at: now,
         last_used_at: now,
@@ -300,13 +263,13 @@ pub async fn finish_registration(
 ///
 /// Returns the options that must be sent to the WebAuthn client (`navigator.credentials.get`).
 /// It saves a login session state keyed by the challenge.
-pub async fn start_login(config: &PasskeyConfig) -> Result<PublicKeyCredentialRequestOptions> {
+pub fn start_login() -> Result<PasskeyRequestOptions> {
     let challenge = generate_challenge()?;
 
-    let options = PublicKeyCredentialRequestOptions {
+    let options = PasskeyRequestOptions {
         challenge: challenge.clone(),
         timeout: Some(60000),
-        rp_id: config.rp_id.clone(),
+        rp_id: CONFIG.rp_id.to_string(),
         allow_credentials: None,
         user_verification: Some("preferred".into()),
     };
@@ -319,32 +282,28 @@ pub async fn start_login(config: &PasskeyConfig) -> Result<PublicKeyCredentialRe
 /// Validates the client response, signature, and counter.
 /// On success, returns the `user_id` of the authenticated user and updates the counter in the `store`.
 pub async fn finish_login(
-    config: &PasskeyConfig,
-    passkey: &mut StoredPasskey,
+    passkey: &Passkey,
     challenge: &str,
     response: LoginResponse,
-    now_ms: i64,
-) -> Result<()> {
-    // 1. Parse clientDataJSON to retrieve the challenge for state lookup
+) -> Result<PrfResults> {
+    // Parse clientDataJSON to retrieve the challenge for state lookup
     let client_data_bytes = BASE64_URL_SAFE_NO_PAD.decode(&response.response.client_data_json)?;
-    let client_data_peek: ClientData = serde_json::from_slice(&client_data_bytes)?;
 
-    // 2. Full clientDataJSON verification
+    // Full clientDataJSON verification
     verify_client_data(
         &response.response.client_data_json,
         challenge,
-        config,
         "webauthn.get",
     )?;
 
-    // 3. Parse & verify authenticator data
+    // Parse & verify authenticator data
     let auth_data_bytes = BASE64_URL_SAFE_NO_PAD.decode(&response.response.authenticator_data)?;
 
     let auth_data = parse_auth_data(&auth_data_bytes)?;
-    verify_rp_id_hash(&auth_data.rp_id_hash, config)?;
+    verify_rp_id_hash(&auth_data.rp_id_hash)?;
     verify_user_present(auth_data.flags)?;
 
-    // 5. Verify user handle if present
+    // Verify user handle if present
     if let Some(ref uh_b64) = response.response.user_handle {
         let uh_bytes = BASE64_URL_SAFE_NO_PAD.decode(uh_b64)?;
         let uid_str = String::from_utf8(uh_bytes)
@@ -354,7 +313,7 @@ pub async fn finish_login(
         }
     }
 
-    // 6. Verify signature
+    // Verify signature
     let pub_key_bytes = BASE64_URL_SAFE_NO_PAD.decode(&passkey.public_key)?;
 
     let client_data_hash = Sha256::digest(&client_data_bytes);
@@ -366,18 +325,6 @@ pub async fn finish_login(
 
     verify_p256_signature(&pub_key_bytes, &signed_data, &sig_bytes)?;
 
-    // 7. Counter check (clone detection)
-    if (auth_data.sign_count as i64) <= passkey.counter
-        && auth_data.sign_count != 0
-        && passkey.counter > 0
-    {
-        // Log removed (was console_error!)
-        return Err(PasskeyError::SignatureCounterRegression);
-    }
-
-    // 8. Update counter
-    passkey.counter = auth_data.sign_count as i64;
-
-    // 9. Return the user ID
-    Ok(())
+    // Return PRF results
+    Ok(response.prf_results)
 }

@@ -1,29 +1,50 @@
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::JsValue;
+use wasm_bindgen::prelude::wasm_bindgen;
+use web_sys::js_sys::{Array as JsArray, Object as JsObject, Reflect as JsReflect, Uint8Array};
 
 #[derive(Debug, Clone)]
 pub struct PasskeyConfig {
-    pub rp_id: String,
-    pub rp_name: String,
-    pub origin: String,
-    pub state_ttl: i64,
+    pub rp_id: &'static str,
+    pub rp_name: &'static str,
+    pub origin: &'static str,
 }
 
+#[wasm_bindgen(getter_with_clone)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StoredPasskey {
+pub struct Passkey {
     pub user_id: String,
     pub cred_id: String,
     pub public_key: String, // Base64url-encoded COSE key
     pub name: String,
     pub created_at: i64,
     pub last_used_at: i64,
-    pub counter: i64,
+}
+
+impl Passkey {
+    pub fn allowed_credentials(&self) -> JsValue {
+        let id = Uint8Array::new_from_slice(self.cred_id.as_bytes());
+
+        let object = JsObject::new();
+        JsReflect::set(
+            &object,
+            &JsValue::from_str("type"),
+            &JsValue::from_str("public-key"),
+        )
+        .unwrap();
+        JsReflect::set(&object, &JsValue::from_str("id"), &id).unwrap();
+
+        let credentials = JsArray::new();
+        credentials.push(&object);
+
+        JsValue::from(credentials)
+    }
 }
 
 // WebAuthn Protocol Types
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct PublicKeyCredentialCreationOptions {
+pub struct PasskeyCreationOptions {
     pub rp: RpEntity,
     pub user: UserEntity,
     pub challenge: String,
@@ -40,7 +61,7 @@ pub struct PublicKeyCredentialCreationOptions {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct PublicKeyCredentialRequestOptions {
+pub struct PasskeyRequestOptions {
     pub challenge: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
@@ -107,10 +128,7 @@ pub struct RegistrationResponse {
     #[serde(rename = "type")]
     pub type_: String,
     pub response: AttestationResponse,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub client_extension_results: Option<serde_json::Value>,
-    // Extension: Allow defining a name for the credential
-    pub name: Option<String>,
+    pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -123,14 +141,20 @@ pub struct AttestationResponse {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct PrfResults {
+    pub first: String,
+    pub second: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LoginResponse {
     pub id: String,
     pub raw_id: String,
     #[serde(rename = "type")]
     pub type_: String,
     pub response: AssertionResponse,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub client_extension_results: Option<serde_json::Value>,
+    pub prf_results: PrfResults,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

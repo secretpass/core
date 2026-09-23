@@ -2,18 +2,13 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum PasskeyError {
-    DatabaseError(String),
     InvalidChallenge,
-    RegistrationSessionExpired,
-    LoginSessionExpired,
     OriginMismatch { expected: String, got: String },
     InvalidOperationType,
     RpIdHashMismatch,
     UserPresentFlagNotSet,
     InvalidSignature(String),
-    PasskeyNotFound,
     UserHandleMismatch,
-    SignatureCounterRegression,
     SerializationError(serde_json::Error),
     Base64Error(base64::DecodeError),
     InternalError(String),
@@ -22,12 +17,7 @@ pub enum PasskeyError {
 impl fmt::Display for PasskeyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::DatabaseError(e) => write!(f, "Database error: {}", e),
             Self::InvalidChallenge => write!(f, "Invalid challenge"),
-            Self::RegistrationSessionExpired => {
-                write!(f, "Registration session expired or invalid")
-            }
-            Self::LoginSessionExpired => write!(f, "Login session expired or invalid"),
             Self::OriginMismatch { expected, got } => {
                 write!(f, "Origin mismatch: expected {}, got {}", expected, got)
             }
@@ -35,9 +25,7 @@ impl fmt::Display for PasskeyError {
             Self::RpIdHashMismatch => write!(f, "RP ID Hash mismatch"),
             Self::UserPresentFlagNotSet => write!(f, "User Present flag not set"),
             Self::InvalidSignature(e) => write!(f, "Invalid signature: {}", e),
-            Self::PasskeyNotFound => write!(f, "Passkey not found"),
             Self::UserHandleMismatch => write!(f, "User Handle mismatch"),
-            Self::SignatureCounterRegression => write!(f, "Signature counter regression"),
             Self::SerializationError(e) => write!(f, "Serialization error: {}", e),
             Self::Base64Error(e) => write!(f, "Base64 decode error: {}", e),
             Self::InternalError(e) => write!(f, "Internal error: {}", e),
