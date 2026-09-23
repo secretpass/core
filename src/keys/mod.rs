@@ -2,5 +2,6 @@ mod derive;
 mod private;
 mod public;
 
-pub use private::{PrivateKeySeed, PrivateKey, EncryptionAlgorithm};
+pub use derive::{EncryptionAlgorithm, PrivateKeySeed};
+pub use private::PrivateKey;
 pub use public::{PublicKey, PublicKeyDto};
