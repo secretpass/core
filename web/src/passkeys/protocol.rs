@@ -9,6 +9,7 @@ use p256::ecdsa::{Signature, VerifyingKey};
 use secretpass_core::{Passkey, PasskeyResidency, SecretpassProject};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::throw_str;
 
 const CHALLENGE_LEN: usize = 32;
@@ -21,52 +22,49 @@ struct ClientData {
     type_: String,
 }
 
+impl ClientData {
+    fn challenge(&self) -> Result<Vec<u8>> {
+        let challenge_bytes = BASE64_URL_SAFE_NO_PAD.decode(&self.challenge)?;
+        if challenge_bytes.len() != CHALLENGE_LEN {
+            throw_str("Invalid challenge length")
+        }
+        Ok(challenge_bytes)
+    }
+}
+
 static CONFIG: PasskeyConfig = PasskeyConfig {
     rp_id: env!("WEBAUTH_RP_ID"),
     rp_name: env!("WEBAUTH_RP_ENTITY"),
     origin: env!("WEBAUTH_RP_ORIGIN"),
 };
 
+#[derive(Clone, Debug)]
 struct AuthData {
     rp_id_hash: Vec<u8>,
-    flags: u8,
     credential_data: Option<Vec<u8>>,
 }
 
-impl AuthData {
-    fn verify_user_presence(&self) -> bool {
-        throw_str("User must be present for authentication")
-    }
-
-    fn verify_residency(&self, project: &SecretpassProject) {
-        let not_synced = self.flags & 0x08 == 0 && self.flags & 0x10 == 0;
-        if not_synced || project.residency == PasskeyResidency::SyncedAllowed {
-            return;
-        }
-        throw_str("Synced passkeys are not allowed")
-    }
-}
-
-fn generate_challenge() -> Result<String> {
+fn generate_challenge() -> Result<Vec<u8>> {
     let mut buf = [0u8; CHALLENGE_LEN];
     getrandom::fill(&mut buf).map_err(|e| {
         PasskeyError::InternalError(format!("Failed to generate random challenge: {e}"))
     })?;
-    Ok(BASE64_URL_SAFE_NO_PAD.encode(buf))
+    Ok(buf.to_vec())
 }
 
 fn verify_client_data(
-    client_data_b64: &str,
-    expected_challenge: &str,
+    bytes: &[u8],
+    expected_challenge: &Vec<u8>,
     expected_type: &str,
-) -> Result<(ClientData, Vec<u8>)> {
-    let bytes = BASE64_URL_SAFE_NO_PAD.decode(client_data_b64)?;
-    let data: ClientData = serde_json::from_slice(&bytes)?;
+) -> Result<()> {
+    let data: ClientData = serde_json::from_slice(bytes)?;
 
-    if data.challenge != expected_challenge {
+    if data.challenge()? != expected_challenge.clone() {
         return Err(PasskeyError::InvalidChallenge);
     }
-    if data.origin != CONFIG.origin {
+
+    // Due to dynamic port configuration
+    if !data.origin.as_str().starts_with(CONFIG.origin) {
         return Err(PasskeyError::OriginMismatch {
             expected: CONFIG.origin.to_string(),
             got: data.origin,
@@ -75,15 +73,40 @@ fn verify_client_data(
     if data.type_ != expected_type {
         return Err(PasskeyError::InvalidOperationType);
     }
-    Ok((data, bytes))
+    Ok(())
 }
 
-fn parse_auth_data(raw: &[u8]) -> Result<AuthData> {
+fn check_flags(flags: u8, project: &SecretpassProject) {
+    let user_present = (flags & 0x01) != 0;
+    let user_verified = (flags & 0x04) != 0;
+    if !user_present || !user_verified {
+        throw_str("User presence and authorization cannot be verified")
+    }
+
+    if project.residency != PasskeyResidency::SyncedAllowed {
+        let backup_eligible = (flags & 0x08) != 0;
+        let backup_completed = (flags & 0x10) != 0;
+
+        if backup_eligible || backup_completed {
+            throw_str("Synced passkeys are not allowed")
+        }
+    }
+
+    let extension_data_included = (flags & 0x80) != 0;
+    if !extension_data_included {
+        throw_str("Extension data missing from authorization flags")
+    }
+}
+
+fn parse_auth_data(raw: &[u8], project: &SecretpassProject) -> Result<AuthData> {
     if raw.len() < 37 {
         return Err(PasskeyError::InternalError("authData too short".into()));
     }
     let rp_id_hash = raw[0..32].to_vec();
     let flags = raw[32];
+
+    check_flags(flags, project);
+
     let credential_data = if (flags & 0x40) != 0 {
         Some(raw[37..].to_vec())
     } else {
@@ -91,7 +114,6 @@ fn parse_auth_data(raw: &[u8]) -> Result<AuthData> {
     };
     Ok(AuthData {
         rp_id_hash,
-        flags,
         credential_data,
     })
 }
@@ -170,7 +192,6 @@ pub async fn start_registration(
     display_name: &str,
 ) -> Result<PasskeyCreationOptions> {
     let challenge = generate_challenge()?;
-    let user_handle = BASE64_URL_SAFE_NO_PAD.encode(user_id.as_bytes());
 
     let options = PasskeyCreationOptions {
         rp: RpEntity {
@@ -178,11 +199,11 @@ pub async fn start_registration(
             id: CONFIG.rp_id.to_string(),
         },
         user: UserEntity {
-            id: user_handle,
+            id: user_id.to_string(),
             name: username.to_string(),
             display_name: display_name.to_string(),
         },
-        challenge: challenge.clone(),
+        challenge,
         pub_key_cred_params: vec![PubKeyCredParam {
             type_: "public-key".into(),
             alg: -7, // ES256
@@ -201,25 +222,29 @@ pub async fn start_registration(
     Ok(options)
 }
 
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(msg: &str);
+}
+
 /// Completes a passkey registration.
 ///
 /// Validates the client response against the stored challenge and RP configuration.
 /// On success, a new [`Passkey`](crate::types::Passkey) is created via the `store`.
-pub async fn finish_registration(
+pub fn finish_registration(
     project: &SecretpassProject,
     options: &PasskeyCreationOptions,
     response: RegistrationResponse,
 ) -> Result<Passkey> {
     verify_client_data(
         &response.response.client_data_json,
-        options.challenge.as_str(),
+        &options.challenge,
         "webauthn.create",
     )?;
 
     // Parse attestation object (CBOR)
-    let att_bytes = BASE64_URL_SAFE_NO_PAD.decode(&response.response.attestation_object)?;
-
-    let att_obj: Value = ciborium::from_reader(att_bytes.as_slice())
+    let att_obj: Value = ciborium::from_reader(response.response.attestation_object.as_slice())
         .map_err(|e| PasskeyError::InternalError(format!("Invalid attestationObject CBOR: {e}")))?;
 
     let Value::Map(m) = &att_obj else {
@@ -238,27 +263,29 @@ pub async fn finish_registration(
         .ok_or_else(|| PasskeyError::InternalError("authData not bytes".into()))?;
 
     // Verify authData
-    let auth_data = parse_auth_data(auth_data_bytes)?;
-    auth_data.verify_residency(project);
-    auth_data.verify_user_presence();
+    let auth_data = parse_auth_data(auth_data_bytes, project)?;
     verify_rp_id_hash(&auth_data.rp_id_hash)?;
 
     // Extract credential
     let cred_bytes = auth_data
         .credential_data
         .ok_or_else(|| PasskeyError::InternalError("Attested Credential Data missing".into()))?;
+    log(format!(">>>> 10, {:?}", cred_bytes).as_str());
     let (cred_id, pub_key_cbor) = extract_credential(&cred_bytes)?;
-
+    log(format!(">>>> 11, {:?}", cred_id).as_str());
     // Validate the public key parses
     CoseKey::from_slice(pub_key_cbor)
         .map_err(|e| PasskeyError::InternalError(format!("Invalid Public Key CBOR: {e}")))?;
+    log(format!(">>>> 12, {:?}", pub_key_cbor).as_str());
 
     // Encode for storage
     let cred_id_b64 = BASE64_URL_SAFE_NO_PAD.encode(cred_id);
+    log(format!(">>>> 13, {:?}", cred_id_b64).as_str());
     let pub_key_b64 = BASE64_URL_SAFE_NO_PAD.encode(pub_key_cbor);
+    log(format!(">>>> 14, {:?}", pub_key_b64).as_str());
 
     let passkey = Passkey {
-        id: cred_id_b64.to_string(),
+        id: cred_id_b64,
         public_key: pub_key_b64,
         user_id: options.user.id.clone(),
         user_name: options.user.name.clone(),
@@ -276,7 +303,7 @@ pub fn start_login() -> Result<PasskeyRequestOptions> {
     let challenge = generate_challenge()?;
 
     let options = PasskeyRequestOptions {
-        challenge: challenge.clone(),
+        challenge,
         timeout: Some(60000),
         rp_id: CONFIG.rp_id.to_string(),
         allow_credentials: None,
@@ -293,12 +320,9 @@ pub fn start_login() -> Result<PasskeyRequestOptions> {
 pub async fn finish_login(
     project: &SecretpassProject,
     passkey: &Passkey,
-    challenge: &str,
+    challenge: &Vec<u8>,
     response: LoginResponse,
 ) -> Result<()> {
-    // Parse clientDataJSON to retrieve the challenge for state lookup
-    let client_data_bytes = BASE64_URL_SAFE_NO_PAD.decode(&response.response.client_data_json)?;
-
     // Full clientDataJSON verification
     verify_client_data(
         &response.response.client_data_json,
@@ -307,16 +331,11 @@ pub async fn finish_login(
     )?;
 
     // Parse & verify authenticator data
-    let auth_data_bytes = BASE64_URL_SAFE_NO_PAD.decode(&response.response.authenticator_data)?;
-
-    let auth_data = parse_auth_data(&auth_data_bytes)?;
-    auth_data.verify_residency(project);
-    auth_data.verify_user_presence();
+    let auth_data = parse_auth_data(&response.response.authenticator_data, project)?;
     verify_rp_id_hash(&auth_data.rp_id_hash)?;
 
     // Verify user handle if present
-    if let Some(ref uh_b64) = response.response.user_handle {
-        let uh_bytes = BASE64_URL_SAFE_NO_PAD.decode(uh_b64)?;
+    if let Some(uh_bytes) = response.response.user_handle {
         let uid_str = String::from_utf8(uh_bytes)
             .map_err(|_| PasskeyError::InternalError("Invalid userHandle utf8".into()))?;
         if uid_str != passkey.user_id {
@@ -327,14 +346,12 @@ pub async fn finish_login(
     // Verify signature
     let pub_key_bytes = BASE64_URL_SAFE_NO_PAD.decode(&passkey.public_key)?;
 
-    let client_data_hash = Sha256::digest(&client_data_bytes);
-    let mut signed_data = Vec::with_capacity(auth_data_bytes.len() + 32);
-    signed_data.extend_from_slice(&auth_data_bytes);
+    let client_data_hash = Sha256::digest(&response.response.client_data_json);
+    let mut signed_data = Vec::with_capacity(response.response.authenticator_data.len() + 32);
+    signed_data.extend_from_slice(&response.response.authenticator_data);
     signed_data.extend_from_slice(&client_data_hash);
 
-    let sig_bytes = BASE64_URL_SAFE_NO_PAD.decode(&response.response.signature)?;
-
-    verify_p256_signature(&pub_key_bytes, &signed_data, &sig_bytes)?;
+    verify_p256_signature(&pub_key_bytes, &signed_data, &response.response.signature)?;
 
     // Return PRF results
     Ok(())

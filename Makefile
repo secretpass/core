@@ -15,11 +15,11 @@ WASM_TARGET    ?= web
 # ------------------------------------------------------------------------------
 web-local:
 	@echo "==> Building WASM for cli server usage"
+	cd web && \
 	WEBAUTH_RP_ID="secretpass.localhost" \
 	WEBAUTH_RP_ORIGIN="http://secretpass.localhost" \
 	WEBAUTH_RP_ENTITY="Secretpass Local" \
 	RUSTFLAGS='--cfg web_sys_unstable_apis' \
-	cd web && \
 	wasm-pack build \
 		--target $(WASM_TARGET) \
 		--release \
@@ -32,11 +32,11 @@ web-local:
 # ------------------------------------------------------------------------------
 web-cloud:
 	@echo "==> Building WASM for cli server usage"
+	cd web && \
 	WEBAUTH_RP_ID="secretpass.cloud" \
 	WEBAUTH_RP_ORIGIN="https://secretpass.cloud" \
 	WEBAUTH_RP_ENTITY="Secretpass Cloud" \
 	RUSTFLAGS='--cfg web_sys_unstable_apis' \
-	cd web && \
 	wasm-pack build \
 		--target $(WASM_TARGET) \
 		--release \

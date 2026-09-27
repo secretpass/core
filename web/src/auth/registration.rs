@@ -2,7 +2,7 @@ use crate::auth::mapping::map_browser_passkey_registration_response;
 use crate::passkeys::types::{PasskeyCreationOptions, RegistrationResponse};
 use crate::passkeys::{finish_registration, start_registration};
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsValue, UnwrapThrowExt};
+use wasm_bindgen::{JsValue, UnwrapThrowExt, throw_str};
 
 use crate::auth::helpers::{get_credentials_container, parse_promise};
 use secretpass_core::{Passkey, PasskeyResidency, SecretpassProject};
@@ -32,9 +32,10 @@ pub async fn register_user(
 
     let reg_response = browser_user_registration(project, &options).await;
 
-    finish_registration(project, &options, reg_response)
-        .await
-        .expect_throw("Error completing passkey registration")
+    match finish_registration(project, &options, reg_response) {
+        Ok(passkey) => passkey,
+        Err(err) => throw_str(format!("Error completing passkey registration: {:?}", err).as_str()),
+    }
 }
 
 async fn browser_user_registration(
@@ -56,10 +57,9 @@ async fn browser_user_registration(
     extensions.set_prf(&prf_extension);
 
     rp.set_id(create_options.rp.id.as_str());
-    let challenge = create_options.challenge.clone();
-    let mut challenge_bytes: Vec<u8> = challenge.into_bytes();
+    let mut challenge = create_options.challenge.clone();
     let pk_options = PublicKeyCredentialCreationOptions::new_with_u8_slice(
-        &mut challenge_bytes,
+        &mut challenge,
         &build_credential_params(),
         &rp,
         &user,

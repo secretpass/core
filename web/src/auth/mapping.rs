@@ -53,19 +53,12 @@ pub fn map_browser_passkey_registration_response(
         .expect_throw("Invalid attestation response");
 
     let response = AttestationResponse {
-        attestation_object: js_array_buffer_to_string(
-            attestation_response.attestation_object(),
-            "Error parsing passkey attestation object",
-        ),
-        client_data_json: js_array_buffer_to_string(
-            attestation_response.client_data_json(),
-            "Error parsing passkey client data",
-        ),
+        attestation_object: Uint8Array::new(&attestation_response.attestation_object()).to_vec(),
+        client_data_json: Uint8Array::new(&attestation_response.client_data_json()).to_vec(),
     };
 
     RegistrationResponse {
         id: pk_credential.id(),
-        raw_id: js_array_buffer_to_string(pk_credential.raw_id(), "Error parsing passkey raw ID"),
         type_: pk_credential.type_(),
         response,
     }
@@ -101,25 +94,14 @@ pub fn map_browser_passkey_authentication(
     let user_handle = assertion_response.user_handle();
 
     let response = AssertionResponse {
-        authenticator_data: js_array_buffer_to_string(
-            assertion_response.authenticator_data(),
-            "Error parsing authenticator data",
-        ),
-        client_data_json: js_array_buffer_to_string(
-            assertion_response.client_data_json(),
-            "Error parsing client data JSON",
-        ),
-        signature: js_array_buffer_to_string(
-            assertion_response.signature(),
-            "Error parsing signature",
-        ),
-        user_handle: user_handle
-            .map(|value| js_array_buffer_to_string(value, "Error parsing user handle")),
+        authenticator_data: Uint8Array::new(&assertion_response.authenticator_data()).to_vec(),
+        client_data_json: Uint8Array::new(&assertion_response.client_data_json()).to_vec(),
+        signature: Uint8Array::new(&assertion_response.signature()).to_vec(),
+        user_handle: user_handle.map(|value| Uint8Array::new(&value).to_vec()),
     };
 
     let login_response = LoginResponse {
         id: pk_credential.id(),
-        raw_id: js_array_buffer_to_string(pk_credential.raw_id(), "Error parsing passkey raw ID"),
         type_: pk_credential.type_(),
         response,
     };
@@ -127,22 +109,10 @@ pub fn map_browser_passkey_authentication(
     (prf_results, login_response)
 }
 
-pub fn js_array_buffer_to_string(buffer: ArrayBuffer, exception: &str) -> String {
-    String::from_utf8(Uint8Array::new(&buffer).to_vec()).expect_throw(exception)
-}
-
 pub fn parse_prf_value(buffer: JsValue, exception: &str) -> [u8; 32] {
     let buffer = ArrayBuffer::from(buffer);
     let as_vec = Uint8Array::new(&buffer).to_vec();
     as_vec.try_into().expect_throw(exception)
-}
-
-pub fn u8_array_to_js(buffer: &[u8]) -> Uint8Array {
-    Uint8Array::new_from_slice(&buffer)
-}
-
-pub fn u8_vec_to_js(buffer: Vec<u8>) -> Uint8Array {
-    Uint8Array::new_from_slice(&buffer)
 }
 
 pub fn allowed_credentials(passkey: &Passkey) -> JsValue {

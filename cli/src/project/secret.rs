@@ -1,17 +1,21 @@
 use serde::{Deserialize, Serialize};
-use crate::project::environment::EnvironmentAccess;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecretDefinition {
-    pub _name: String,
+    pub name: String,
     pub description: String,
-    pub _environment: Vec<String>
+    pub environment: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TeamDefinition {
-    pub _name: String,
-    pub description: String,
-    pub _members: Vec<String>,
-    pub _access: Vec<EnvironmentAccess>,
+pub struct SecretValue {
+    pub secret_name: String,
+    pub environment: String,
+    pub user_id: String,
+    pub public_key_id: String,
+    pub encrypted_value: String,
+}
+
+impl SecretValue {
+    pub fn write() {}
 }

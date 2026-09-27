@@ -1,9 +1,15 @@
 [package]
-name = "secretpass-sport-cli"
+name = "secretpass-cli"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = {version = "4.6.6", features = ["derive"]}
-serde = {version = "1.0.229" }
-secretpass-sport = { path = ".." }
+anyhow = "1.0.104"
+axum = { version = "0.8.9" }
+clap = { version = "4.6.6", features = ["derive"] }
+home = "0.5.12"
+secretpass-core = { path = ".." }
+serde = { version = "1.0.229" }
+yaml_serde = "0.10.7"
+tokio = { version = "1.53.1", features = ["rt-multi-thread"] }
+webbrowser = "1.2.4"

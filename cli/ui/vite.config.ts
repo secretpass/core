@@ -13,13 +13,15 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
-  build: {
-    rolldownOptions: {
-      input: {
-        run: "run.html",
-        init: "init.html",
-        manager: "manager.html",
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://secretpass.localhost:5000",
+        changeOrigin: true,
       },
     },
+  },
+  resolve: {
+    tsconfigPaths: true,
   },
 });

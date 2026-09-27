@@ -7,6 +7,11 @@ edition = "2024"
 # This library is used exclusively in the browser as part of the cloud for on device encryption and decryption
 crate-type = ["cdylib"]
 
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom_v2 = { package = "getrandom", version = "0.2", features = ["js"] }
 

@@ -13,7 +13,7 @@ pub struct PasskeyConfig {
 pub struct PasskeyCreationOptions {
     pub rp: RpEntity,
     pub user: UserEntity,
-    pub challenge: String,
+    pub challenge: Vec<u8>,
     pub pub_key_cred_params: Vec<PubKeyCredParam>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
@@ -28,7 +28,7 @@ pub struct PasskeyCreationOptions {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PasskeyRequestOptions {
-    pub challenge: String,
+    pub challenge: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
     pub rp_id: String,
@@ -90,7 +90,6 @@ pub struct AuthenticatorSelection {
 #[serde(rename_all = "camelCase")]
 pub struct RegistrationResponse {
     pub id: String,
-    pub raw_id: String,
     #[serde(rename = "type")]
     pub type_: String,
     pub response: AttestationResponse,
@@ -100,8 +99,8 @@ pub struct RegistrationResponse {
 #[serde(rename_all = "camelCase")]
 pub struct AttestationResponse {
     #[serde(rename = "clientDataJSON")]
-    pub client_data_json: String,
-    pub attestation_object: String,
+    pub client_data_json: Vec<u8>,
+    pub attestation_object: Vec<u8>,
 }
 
 pub struct PrfResults {
@@ -113,7 +112,6 @@ pub struct PrfResults {
 #[serde(rename_all = "camelCase")]
 pub struct LoginResponse {
     pub id: String,
-    pub raw_id: String,
     #[serde(rename = "type")]
     pub type_: String,
     pub response: AssertionResponse,
@@ -123,9 +121,9 @@ pub struct LoginResponse {
 #[serde(rename_all = "camelCase")]
 pub struct AssertionResponse {
     #[serde(rename = "clientDataJSON")]
-    pub client_data_json: String,
-    pub authenticator_data: String,
-    pub signature: String,
+    pub client_data_json: Vec<u8>,
+    pub authenticator_data: Vec<u8>,
+    pub signature: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub user_handle: Option<String>,
+    pub user_handle: Option<Vec<u8>>,
 }

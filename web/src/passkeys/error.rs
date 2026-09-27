@@ -6,7 +6,6 @@ pub enum PasskeyError {
     OriginMismatch { expected: String, got: String },
     InvalidOperationType,
     RpIdHashMismatch,
-    UserPresentFlagNotSet,
     InvalidSignature(String),
     UserHandleMismatch,
     SerializationError(serde_json::Error),
@@ -23,7 +22,6 @@ impl fmt::Display for PasskeyError {
             }
             Self::InvalidOperationType => write!(f, "Invalid operation type"),
             Self::RpIdHashMismatch => write!(f, "RP ID Hash mismatch"),
-            Self::UserPresentFlagNotSet => write!(f, "User Present flag not set"),
             Self::InvalidSignature(e) => write!(f, "Invalid signature: {}", e),
             Self::UserHandleMismatch => write!(f, "User Handle mismatch"),
             Self::SerializationError(e) => write!(f, "Serialization error: {}", e),

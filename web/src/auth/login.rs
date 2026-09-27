@@ -22,7 +22,7 @@ pub async fn login_user(project: &SecretpassProject, passkey: Passkey) -> Secure
 
     let (prf_results, login_response) = browser_user_login(project, &passkey, login_options).await;
 
-    finish_login(&project, &passkey, challenge.as_str(), login_response)
+    finish_login(&project, &passkey, &challenge, login_response)
         .await
         .expect_throw("Error finishing login process");
 
@@ -34,8 +34,7 @@ async fn browser_user_login(
     passkey: &Passkey,
     login_options: PasskeyRequestOptions,
 ) -> (PrfResults, LoginResponse) {
-    let challenge = login_options.challenge.clone();
-    let mut challenge_bytes: Vec<u8> = challenge.into_bytes();
+    let mut challenge = login_options.challenge.clone();
 
     let prf_value =
         AuthenticationExtensionsPrfValues::new_with_u8_array(&encode_prf_salt(project.prf_salt()));
@@ -47,7 +46,7 @@ async fn browser_user_login(
     let extensions = AuthenticationExtensionsClientInputs::new();
     extensions.set_prf(&prf_extension);
 
-    let pk_options = PublicKeyCredentialRequestOptions::new_with_u8_slice(&mut challenge_bytes);
+    let pk_options = PublicKeyCredentialRequestOptions::new_with_u8_slice(&mut challenge);
     pk_options.set_rp_id(login_options.rp_id.as_str());
     pk_options.set_allow_credentials(&allowed_credentials(passkey));
     pk_options.set_user_verification(UserVerificationRequirement::Required);
