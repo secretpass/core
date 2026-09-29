@@ -3,6 +3,7 @@ import type { SecureSession } from "@/core/web";
 import type { SecretManagerConfig } from "@/types";
 
 export type SecretManger = {
+  is_new: boolean;
   directory: string | null;
   config: SecretManagerConfig | null;
   session: SecureSession | null;
@@ -14,6 +15,7 @@ interface SecretMangerExtended extends SecretManger {
 }
 
 export const useSecretManager = create<SecretMangerExtended>((set) => ({
+  is_new: false,
   directory: null,
   config: null,
   session: null,
@@ -27,11 +29,14 @@ export const useSecretManager = create<SecretMangerExtended>((set) => ({
         .then((directory) => {
           set({ directory });
         }),
-      fetch("api/project")
-        .then((response) => response.json())
-        .then((config) => {
-          set({ config });
-        }),
+      fetch("api/config").then((response) => {
+        if (response.ok) {
+          response.json().then((config) => set({ config, is_new: false }));
+        }
+        if (response.status === 404) {
+          set({ is_new: true });
+        }
+      }),
     ]);
   },
 }));

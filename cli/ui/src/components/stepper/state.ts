@@ -48,6 +48,9 @@ export function useStepper(first_step: string, steps: StepperStep[]): Stepper {
             }
             if (step?.next) {
               state.active = step.next;
+            } else if (complete) {
+              state.active = "";
+              state.completed = true;
             }
           }),
         previousStep: () =>

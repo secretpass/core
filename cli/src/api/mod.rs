@@ -1,7 +1,8 @@
 mod api;
-mod project;
+mod config;
+mod dto;
 mod setup;
 mod utility;
 
 pub use api::serve_local_server;
-pub use project::init_config;
+pub use config::init_config;

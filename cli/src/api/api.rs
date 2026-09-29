@@ -1,10 +1,10 @@
-use crate::api::project::project_routes;
+use crate::api::config::config_routes;
 use crate::api::utility::utilities_router;
 use axum::Router;
 
 pub async fn serve_local_server(cloud: bool, cloud_origin: String) {
     let app = Router::new()
-        .merge(project_routes())
+        .merge(config_routes())
         .merge(utilities_router());
 
     // Run the API on port 5000 proxied by vite while in debug mode

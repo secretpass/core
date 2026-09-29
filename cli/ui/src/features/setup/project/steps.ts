@@ -34,7 +34,6 @@ export function useProjectStepper() {
       label: "Admin Profile",
       status: StepperStepStatus.Pending,
       previous: "environments",
-      next: "complete",
     },
   ]);
 }

@@ -1,11 +1,10 @@
 use crate::enums::{EncryptionAlgorithm, PasskeyResidency};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use tsify::Tsify;
 use uuid::Uuid;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-#[wasm_bindgen(getter_with_clone)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
 pub struct SecretpassProject {
     pub id: String, // Fixed - can't be changed
     pub name: String,
@@ -24,31 +23,6 @@ impl Default for SecretpassProject {
             residency: PasskeyResidency::SyncedAllowed,
             algorithm: EncryptionAlgorithm::ECC,
             created_at: chrono::Utc::now().to_rfc3339(),
-        }
-    }
-}
-
-#[wasm_bindgen]
-impl SecretpassProject {
-    #[wasm_bindgen(constructor)]
-    pub fn new_from_js(
-        id: String,
-        name: String,
-        description: String,
-        algorithm: &str,
-        residency: &str,
-        created_at: String,
-    ) -> SecretpassProject {
-        let algorithm = EncryptionAlgorithm::from_str(algorithm).unwrap();
-        let residency = PasskeyResidency::from_str(residency).unwrap();
-
-        SecretpassProject {
-            id,
-            name,
-            description,
-            residency,
-            algorithm,
-            created_at,
         }
     }
 }

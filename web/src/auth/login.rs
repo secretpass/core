@@ -4,9 +4,10 @@ use crate::passkeys::types::{LoginResponse, PasskeyRequestOptions, PrfResults};
 use crate::passkeys::{finish_login, start_login};
 use crate::session::SecureSession;
 use secretpass_core::{Passkey, SecretpassProject};
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use tsify::Tsify;
 use wasm_bindgen::UnwrapThrowExt;
-use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::js_sys::Uint8Array;
 use web_sys::{
     AuthenticationExtensionsClientInputs, AuthenticationExtensionsPrfInputs,
@@ -14,13 +15,23 @@ use web_sys::{
     UserVerificationRequirement,
 };
 
-#[wasm_bindgen]
-pub async fn login_user(project: &SecretpassProject, passkey: Passkey) -> SecureSession {
+#[derive(Debug, Deserialize, Tsify)]
+pub struct LoginParams {
+    project: SecretpassProject,
+    passkey: Passkey,
+}
+
+pub async fn login_user(params: &str) -> SecureSession {
+    let params: LoginParams =
+        serde_json::from_str(params).expect_throw("Error parsing login parameters");
+    let project = params.project;
+    let passkey = params.passkey;
+
     let login_options = start_login().expect_throw("Error starting login process");
 
     let challenge = login_options.challenge.clone();
 
-    let (prf_results, login_response) = browser_user_login(project, &passkey, login_options).await;
+    let (prf_results, login_response) = browser_user_login(&project, &passkey, login_options).await;
 
     finish_login(&project, &passkey, &challenge, login_response)
         .await

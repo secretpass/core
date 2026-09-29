@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
@@ -22,4 +22,25 @@ export function useComplexState<T extends object>(
     ),
   );
   return useZustandState();
+}
+
+export function useUncaughtWasmError() {
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const listener = (event: ErrorEvent) => {
+      const stack = (event.error?.stack as string) || "";
+      if (stack.includes(".wasm:wasm-function[")) {
+        setError(event.message.replace("Uncaught Error: ", ""));
+      }
+    };
+    window.addEventListener("error", listener);
+    return () => {
+      window.removeEventListener("error", listener);
+    };
+  }, []);
+
+  const clear = useCallback(() => setError(null), []);
+
+  return { message: error, clear };
 }

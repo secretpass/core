@@ -9,41 +9,27 @@ import {
 import { IconTrashFilled } from "@tabler/icons-react";
 import clsx from "clsx";
 import { useMemo } from "react";
-import * as z from "zod";
 import type { Stepper } from "@/components/stepper";
 import { ControlButtons } from "@/features/setup/project/controls.tsx";
+import {
+  type NewEnvironment,
+  NewEnvironmentItemSchema,
+  NewEnvironmentsSchema,
+  type RegistrationState,
+} from "@/features/setup/project/types.ts";
 import type { ComplexState } from "@/utils.ts";
-
-const environmentItemSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .regex(/^[a-zA-Z_][a-zA-Z0-9_-]*$/, {
-      message:
-        "Must be a valid environment variable name (letters, numbers, underscores, cannot start with a number).",
-    }),
-  description: z.string().optional(),
-});
-
-const environmentsSchema = z.object({
-  environments: z
-    .array(environmentItemSchema)
-    .min(1)
-    .refine(
-      (items) => new Set(items.map((item) => item.name)).size === items.length,
-    ),
-});
-
-export type SetupEnvironments = z.infer<typeof environmentsSchema>;
 
 export function EnvironmentDefinitions({
   stepper,
   state,
 }: {
   stepper: Stepper;
-  state: ComplexState<SetupEnvironments>;
+  state: ComplexState<RegistrationState>;
 }) {
-  const is_valid = useMemo(() => environmentsSchema.validate(state), [state]);
+  const is_valid = useMemo(
+    () => NewEnvironmentsSchema.validate(state.environments),
+    [state.environments],
+  );
 
   return (
     <div className="flex flex-col gap-6 grow">
@@ -109,11 +95,11 @@ function EnvironmentEditor({
   state,
 }: {
   index: number;
-  env: SetupEnvironments["environments"][number];
-  state: ComplexState<SetupEnvironments>;
+  env: NewEnvironment;
+  state: ComplexState<RegistrationState>;
 }) {
   const is_valid = useMemo(() => {
-    if (!environmentItemSchema.validate(env)) {
+    if (!NewEnvironmentItemSchema.validate(env)) {
       return false;
     }
     const duplicates = state.environments.filter((e) => e.name === env.name);

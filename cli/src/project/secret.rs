@@ -11,8 +11,6 @@ pub struct SecretDefinition {
 pub struct SecretValue {
     pub secret_name: String,
     pub environment: String,
-    pub user_id: String,
-    pub public_key_id: String,
     pub encrypted_value: String,
 }
 

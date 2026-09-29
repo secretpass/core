@@ -10,16 +10,15 @@ import { IconFingerprint } from "@tabler/icons-react";
 import { type MouseEventHandler, useMemo } from "react";
 import * as z from "zod";
 import type { Stepper } from "@/components/stepper";
+import type { RegistrationState } from "@/features/setup/project/types.ts";
 import type { ComplexState } from "@/utils.ts";
 import { ControlButtons } from "./controls";
 
 const profileSchema = z.object({
   user_id: z.uuidv4(),
-  name: z.string().min(1),
-  email_address: z.email(),
+  user_display_name: z.string().min(1),
+  user_email_address: z.email(),
 });
-
-export type ProfileSchema = z.infer<typeof profileSchema>;
 
 export function AdminProfile({
   state,
@@ -28,7 +27,7 @@ export function AdminProfile({
   error,
 }: {
   error: string | null;
-  state: ComplexState<ProfileSchema>;
+  state: ComplexState<RegistrationState>;
   stepper: Stepper;
   onComplete: MouseEventHandler;
 }) {
@@ -56,8 +55,8 @@ export function AdminProfile({
           name="user_name"
           variant="secondary"
           placeholder="Full Name..."
-          value={state.name}
-          onChange={(e) => state.update({ name: e.target.value })}
+          value={state.user_display_name}
+          onChange={(e) => state.update({ user_display_name: e.target.value })}
         />
       </TextField>
 
@@ -67,8 +66,8 @@ export function AdminProfile({
           name="email_address"
           variant="secondary"
           placeholder="Email Address..."
-          value={state.email_address}
-          onChange={(e) => state.update({ email_address: e.target.value })}
+          value={state.user_email_address}
+          onChange={(e) => state.update({ user_email_address: e.target.value })}
         />
       </TextField>
 

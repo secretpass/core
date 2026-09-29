@@ -103,6 +103,7 @@ pub struct AttestationResponse {
     pub attestation_object: Vec<u8>,
 }
 
+#[derive(Debug)]
 pub struct PrfResults {
     pub first: [u8; 32],
     pub second: [u8; 32],

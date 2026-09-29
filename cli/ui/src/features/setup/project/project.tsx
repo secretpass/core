@@ -2,45 +2,37 @@ import { Form } from "@heroui/react";
 import { Activity, useCallback, useState } from "react";
 import { StepperView } from "@/components/stepper";
 import {
-  type EncryptionAlgorithm,
   type Passkey,
-  type PasskeyResidency,
   register_user,
-  SecretpassProject,
+  type RegistrationParams,
+  type SecretpassProject,
 } from "@/core/web";
-import { useSecretManager } from "@/manager";
-import { useComplexState } from "@/utils.ts";
+import { CompletionScreen } from "@/features/setup/project/completion.tsx";
+import type { RegistrationState } from "@/features/setup/project/types.ts";
+import { useComplexState, useUncaughtWasmError } from "@/utils.ts";
 import { EncryptionAlgorithmSelector } from "./algorithms";
-import { EnvironmentDefinitions, type SetupEnvironments } from "./environment";
+import { EnvironmentDefinitions } from "./environment";
 import { ProjectOverview } from "./overview";
-import { AdminProfile, type ProfileSchema } from "./profile";
+import { AdminProfile } from "./profile";
 import { PasskeyResidencySelector } from "./residency";
 import { useProjectStepper } from "./steps";
 
 export function CreateProject() {
   const [error, setError] = useState<string | null>(null);
-  const [passkey, setPasskey] = useState<Passkey | null>(null);
+  const wasm_error = useUncaughtWasmError();
+  const [passkey, setPasskey] = useState<{
+    passkey: Passkey;
+    project: SecretpassProject;
+  } | null>(null);
   const stepper = useProjectStepper();
-  const manager = useSecretManager();
-  const overview = useComplexState({
-    id: manager.config?.project.id || "",
-    name: manager.config?.project.name || "",
-    description: manager.config?.project.description || "",
-  });
 
-  const algorithm = useComplexState<{
-    algorithm: EncryptionAlgorithm;
-  }>({
-    algorithm: manager.config?.project.algorithm || "ECC",
-  });
-
-  const residency = useComplexState<{
-    residency: PasskeyResidency;
-  }>({
-    residency: manager.config?.project.residency || "SyncedAllowed",
-  });
-
-  const environments = useComplexState<SetupEnvironments>({
+  const state = useComplexState<RegistrationState>({
+    id: crypto.randomUUID(),
+    project_name: "",
+    description: "",
+    algorithm: "ECC",
+    residency: "SyncedAllowed",
+    created: new Date().toISOString(),
     environments: [
       {
         name: "development",
@@ -55,67 +47,108 @@ export function CreateProject() {
         description: "Prod secrets, heavily restricted",
       },
     ],
-  });
-
-  const profile = useComplexState<ProfileSchema>({
     user_id: crypto.randomUUID(),
-    email_address: "",
-    name: "",
+    user_display_name: "",
+    user_email_address: "",
   });
 
   const onComplete = useCallback(() => {
     setError(null);
+    wasm_error.clear();
 
-    const project = new SecretpassProject(
-      overview.id,
-      overview.name,
-      overview.description,
-      algorithm.algorithm,
-      residency.residency,
-      new Date().toISOString(),
-    );
+    const project: SecretpassProject = {
+      id: state.id,
+      name: state.project_name,
+      description: state.description,
+      algorithm: state.algorithm,
+      residency: state.residency,
+      created_at: state.created,
+    };
+    const params: RegistrationParams = {
+      project,
+      user_id: state.user_id,
+      email_address: state.user_email_address,
+      display_name: state.user_display_name,
+    };
 
-    register_user(project, profile.user_id, profile.email_address, profile.name)
-      .then((passkey) => {
+    register_user(JSON.stringify(params))
+      .then((passkey_json) => {
+        const passkey: Passkey = JSON.parse(passkey_json);
         stepper.nextStep(true);
-        setPasskey(passkey);
+        setPasskey({ passkey, project });
       })
       .catch((err) => {
         setError(String(err));
       });
-  }, [stepper, overview, algorithm, residency, profile]);
+  }, [stepper, state, wasm_error]);
 
   return (
     <div className="relative flex w-full min-w-xl gap-6">
       <StepperView stepper={stepper} />
 
       <Form className="grow flex flex-col w-2/3 px-4 py-6 rounded-2xl gap-6 min-h-80 max-h-[70vh] overflow-y-auto">
-        <Activity mode={stepper.active === "overview" ? "visible" : "hidden"}>
-          <ProjectOverview state={overview} stepper={stepper} />
-        </Activity>
-
-        <Activity mode={stepper.active === "encryption" ? "visible" : "hidden"}>
-          <EncryptionAlgorithmSelector state={algorithm} stepper={stepper} />
-        </Activity>
-
-        <Activity mode={stepper.active === "residency" ? "visible" : "hidden"}>
-          <PasskeyResidencySelector state={residency} stepper={stepper} />
+        <Activity
+          mode={
+            stepper.active === "overview" && !stepper.completed
+              ? "visible"
+              : "hidden"
+          }
+        >
+          <ProjectOverview state={state} stepper={stepper} />
         </Activity>
 
         <Activity
-          mode={stepper.active === "environments" ? "visible" : "hidden"}
+          mode={
+            stepper.active === "encryption" && !stepper.completed
+              ? "visible"
+              : "hidden"
+          }
         >
-          <EnvironmentDefinitions stepper={stepper} state={environments} />
+          <EncryptionAlgorithmSelector state={state} stepper={stepper} />
         </Activity>
 
-        <Activity mode={stepper.active === "profile" ? "visible" : "hidden"}>
+        <Activity
+          mode={
+            stepper.active === "residency" && !stepper.completed
+              ? "visible"
+              : "hidden"
+          }
+        >
+          <PasskeyResidencySelector state={state} stepper={stepper} />
+        </Activity>
+
+        <Activity
+          mode={
+            stepper.active === "environments" && !stepper.completed
+              ? "visible"
+              : "hidden"
+          }
+        >
+          <EnvironmentDefinitions stepper={stepper} state={state} />
+        </Activity>
+
+        <Activity
+          mode={
+            stepper.active === "profile" && !stepper.completed
+              ? "visible"
+              : "hidden"
+          }
+        >
           <AdminProfile
-            error={error}
+            error={error || wasm_error.message}
             stepper={stepper}
-            state={profile}
+            state={state}
             onComplete={onComplete}
           />
         </Activity>
+
+        {passkey && (
+          <CompletionScreen
+            state={state}
+            project={passkey.project as SecretpassProject}
+            passkey={passkey.passkey as Passkey}
+          />
+        )}
       </Form>
     </div>
   );

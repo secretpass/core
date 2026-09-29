@@ -1,11 +1,13 @@
 use crate::auth::mapping::map_browser_passkey_registration_response;
 use crate::passkeys::types::{PasskeyCreationOptions, RegistrationResponse};
 use crate::passkeys::{finish_registration, start_registration};
+use serde::Deserialize;
+use tsify::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsValue, UnwrapThrowExt, throw_str};
 
 use crate::auth::helpers::{get_credentials_container, parse_promise};
-use secretpass_core::{Passkey, PasskeyResidency, SecretpassProject};
+use secretpass_core::{PasskeyResidency, SecretpassProject};
 use web_sys::js_sys::{Array as JsArray, Object as JsObject, Reflect as JsReflect};
 use web_sys::{
     AttestationConveyancePreference, AuthenticationExtensionsClientInputs,
@@ -14,18 +16,24 @@ use web_sys::{
     PublicKeyCredentialUserEntity, UserVerificationRequirement,
 };
 
-#[wasm_bindgen]
-pub async fn register_user(
-    project: &SecretpassProject,
+#[derive(Debug, Deserialize, Tsify)]
+struct RegistrationParams {
+    project: SecretpassProject,
     user_id: String,
     email_address: String,
     display_name: String,
-) -> Passkey {
+}
+
+#[wasm_bindgen]
+pub async fn register_user(params: &str) -> String {
+    let params: RegistrationParams =
+        serde_json::from_str(params).expect_throw("Error parsing registration parameters");
+    let project = &params.project;
     let options = start_registration(
         project,
-        user_id.as_str(),
-        email_address.as_str(),
-        display_name.as_str(),
+        &params.user_id,
+        &params.email_address,
+        &params.display_name,
     )
     .await
     .expect_throw("Error starting passkey registration");
@@ -33,8 +41,8 @@ pub async fn register_user(
     let reg_response = browser_user_registration(project, &options).await;
 
     match finish_registration(project, &options, reg_response) {
-        Ok(passkey) => passkey,
-        Err(err) => throw_str(format!("Error completing passkey registration: {:?}", err).as_str()),
+        Ok(passkey) => serde_json::to_string(&passkey).expect_throw("Error serializing passkey"),
+        Err(err) => throw_str(&format!("Error completing passkey registration: {:?}", err)),
     }
 }
 
@@ -42,12 +50,12 @@ async fn browser_user_registration(
     project: &SecretpassProject,
     create_options: &PasskeyCreationOptions,
 ) -> RegistrationResponse {
-    let rp = PublicKeyCredentialRpEntity::new(create_options.rp.name.as_str());
+    let rp = PublicKeyCredentialRpEntity::new(&create_options.rp.name);
     let user_id = create_options.user.id.clone();
     let mut user_id_bytes: Vec<u8> = user_id.into_bytes();
     let user = PublicKeyCredentialUserEntity::new_with_u8_slice(
-        create_options.user.name.as_str(),
-        create_options.user.display_name.as_str(),
+        &create_options.user.name,
+        &create_options.user.display_name,
         &mut user_id_bytes,
     );
 
@@ -56,7 +64,7 @@ async fn browser_user_registration(
     let prf_extension = AuthenticationExtensionsPrfInputs::new();
     extensions.set_prf(&prf_extension);
 
-    rp.set_id(create_options.rp.id.as_str());
+    rp.set_id(&create_options.rp.id);
     let mut challenge = create_options.challenge.clone();
     let pk_options = PublicKeyCredentialCreationOptions::new_with_u8_slice(
         &mut challenge,

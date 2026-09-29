@@ -16,18 +16,19 @@ codegen-units = 1
 getrandom_v2 = { package = "getrandom", version = "0.2", features = ["js"] }
 
 [dependencies]
-chrono = { version = "0.4.45", features = ["wasm-bindgen"] }
-serde_json = "1.0.151"
-wasm-bindgen = { version = "0.2.128" }
-wasm-bindgen-futures = "0.4.78"
 base64 = "0.23.1"
-serde = { version = "1.0.229", features = ["derive"] }
-p256 = "0.13"
-sha2 = "0.11.0"
-getrandom = { version = "0.4.3", features = ["wasm_js"] }
+chrono = { version = "0.4.45", features = ["wasm-bindgen"] }
 ciborium = "0.2.2"
 coset = "0.4.2"
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
+p256 = "0.13"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
 "secretpass-core" = { path = ".." }
+tsify = "0.5.8"
+wasm-bindgen = { version = "0.2.128" }
+wasm-bindgen-futures = "0.4.78"
 
 
 [dependencies.web-sys]

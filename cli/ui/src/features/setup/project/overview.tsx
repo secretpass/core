@@ -1,5 +1,6 @@
 import { Description, Input, Label, TextArea, TextField } from "@heroui/react";
 import type { Stepper } from "@/components/stepper";
+import type { RegistrationState } from "@/features/setup/project/types.ts";
 import type { ComplexState } from "@/utils.ts";
 import { ControlButtons } from "./controls";
 
@@ -7,7 +8,7 @@ export function ProjectOverview({
   state,
   stepper,
 }: {
-  state: ComplexState<{ id: string; name: string; description: string }>;
+  state: ComplexState<RegistrationState>;
   stepper: Stepper;
 }) {
   return (
@@ -33,8 +34,8 @@ export function ProjectOverview({
           name="name"
           variant="secondary"
           placeholder="My Top Secret Project"
-          value={state.name}
-          onChange={(e) => state.update({ name: e.target.value })}
+          value={state.project_name}
+          onChange={(e) => state.update({ project_name: e.target.value })}
         />
       </TextField>
 
@@ -51,7 +52,7 @@ export function ProjectOverview({
 
       <ControlButtons
         stepper={stepper}
-        next={state.name ? "active" : "disabled"}
+        next={state.project_name ? "active" : "disabled"}
         completeOnNext
       />
     </div>

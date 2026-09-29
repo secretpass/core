@@ -1,6 +1,7 @@
 use crate::passkeys::error::{PasskeyError, Result};
 use crate::passkeys::types::*;
-use base64::prelude::*;
+use base64::Engine;
+use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use coset::cbor::value::Value;
 use coset::{CborSerializable, CoseKey, Label};
 use p256::EncodedPoint;
@@ -9,7 +10,6 @@ use p256::ecdsa::{Signature, VerifyingKey};
 use secretpass_core::{Passkey, PasskeyResidency, SecretpassProject};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::throw_str;
 
 const CHALLENGE_LEN: usize = 32;
@@ -90,11 +90,6 @@ fn check_flags(flags: u8, project: &SecretpassProject) {
         if backup_eligible || backup_completed {
             throw_str("Synced passkeys are not allowed")
         }
-    }
-
-    let extension_data_included = (flags & 0x80) != 0;
-    if !extension_data_included {
-        throw_str("Extension data missing from authorization flags")
     }
 }
 
@@ -222,12 +217,6 @@ pub async fn start_registration(
     Ok(options)
 }
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(msg: &str);
-}
-
 /// Completes a passkey registration.
 ///
 /// Validates the client response against the stored challenge and RP configuration.
@@ -270,19 +259,14 @@ pub fn finish_registration(
     let cred_bytes = auth_data
         .credential_data
         .ok_or_else(|| PasskeyError::InternalError("Attested Credential Data missing".into()))?;
-    log(format!(">>>> 10, {:?}", cred_bytes).as_str());
     let (cred_id, pub_key_cbor) = extract_credential(&cred_bytes)?;
-    log(format!(">>>> 11, {:?}", cred_id).as_str());
     // Validate the public key parses
     CoseKey::from_slice(pub_key_cbor)
         .map_err(|e| PasskeyError::InternalError(format!("Invalid Public Key CBOR: {e}")))?;
-    log(format!(">>>> 12, {:?}", pub_key_cbor).as_str());
 
     // Encode for storage
     let cred_id_b64 = BASE64_URL_SAFE_NO_PAD.encode(cred_id);
-    log(format!(">>>> 13, {:?}", cred_id_b64).as_str());
     let pub_key_b64 = BASE64_URL_SAFE_NO_PAD.encode(pub_key_cbor);
-    log(format!(">>>> 14, {:?}", pub_key_b64).as_str());
 
     let passkey = Passkey {
         id: cred_id_b64,
@@ -343,15 +327,16 @@ pub async fn finish_login(
         }
     }
 
-    // Verify signature
-    let pub_key_bytes = BASE64_URL_SAFE_NO_PAD.decode(&passkey.public_key)?;
-
     let client_data_hash = Sha256::digest(&response.response.client_data_json);
     let mut signed_data = Vec::with_capacity(response.response.authenticator_data.len() + 32);
     signed_data.extend_from_slice(&response.response.authenticator_data);
     signed_data.extend_from_slice(&client_data_hash);
 
-    verify_p256_signature(&pub_key_bytes, &signed_data, &response.response.signature)?;
+    verify_p256_signature(
+        &passkey.public_key_bytes(),
+        &signed_data,
+        &response.response.signature,
+    )?;
 
     // Return PRF results
     Ok(())

@@ -67,7 +67,7 @@ pub fn map_browser_passkey_registration_response(
 pub fn parse_prf_result(outputs: AuthenticationExtensionsClientOutputs) -> PrfResults {
     let prf_result = get_prf_value(outputs);
 
-    let results = JsReflect::get(&prf_result, &JsValue::from_str("result"))
+    let results = JsReflect::get(&prf_result, &JsValue::from_str("results"))
         .expect_throw(prf_error("06").as_str());
 
     let first = JsReflect::get(&results, &JsValue::from_str("first"))
@@ -116,7 +116,7 @@ pub fn parse_prf_value(buffer: JsValue, exception: &str) -> [u8; 32] {
 }
 
 pub fn allowed_credentials(passkey: &Passkey) -> JsValue {
-    let id = Uint8Array::new_from_slice(passkey.id.as_bytes());
+    let id = Uint8Array::new_from_slice(&passkey.id_bytes());
 
     let object = JsObject::new();
     JsReflect::set(
