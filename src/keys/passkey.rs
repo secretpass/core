@@ -1,6 +1,6 @@
 pub(crate) use crate::enums::PublicKeyType;
-use base64::Engine;
-use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+use crate::utils::bin_decode;
+use crate::{PublicKey, PublicKeyDto};
 use serde::{Deserialize, Serialize};
 use tsify::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -17,6 +17,16 @@ pub struct StoredPublicKey {
     pub ecc: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub passkey: Option<Passkey>, // Only stored for user keys
+}
+
+impl StoredPublicKey {
+    fn public_key(&self) -> anyhow::Result<PublicKey> {
+        let dto = PublicKeyDto {
+            kem: self.kem.clone(),
+            ecc: self.ecc.clone(),
+        };
+        PublicKey::from_dto(dto)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
@@ -36,11 +46,11 @@ impl Passkey {
         )
     }
 
-    pub fn id_bytes(&self) -> Vec<u8> {
-        BASE64_URL_SAFE_NO_PAD.decode(&self.id).unwrap()
+    pub fn id_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        bin_decode(&self.id)
     }
 
-    pub fn public_key_bytes(&self) -> Vec<u8> {
-        BASE64_URL_SAFE_NO_PAD.decode(&self.public_key).unwrap()
+    pub fn public_key_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        bin_decode(&self.public_key)
     }
 }
