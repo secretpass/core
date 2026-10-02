@@ -1,11 +1,17 @@
-use crate::api::config::config_routes;
-use crate::api::utility::utilities_router;
+use crate::api::project::project_routes;
+use crate::api::users::user_routes;
+use crate::project::get_working_directory;
 use axum::Router;
+use axum::extract::Request;
+use axum::http::HeaderValue;
+use axum::middleware;
+use axum::response::Response;
 
 pub async fn serve_local_server(cloud: bool, cloud_origin: String) {
     let app = Router::new()
-        .merge(config_routes())
-        .merge(utilities_router());
+        .merge(project_routes())
+        .merge(user_routes())
+        .layer(middleware::from_fn(add_dir_header));
 
     // Run the API on port 5000 proxied by vite while in debug mode
     let address = if cfg!(debug_assertions) {
@@ -39,4 +45,17 @@ pub async fn serve_local_server(cloud: bool, cloud_origin: String) {
     }
 
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn add_dir_header(req: Request, next: middleware::Next) -> Response {
+    let mut response = next.run(req).await;
+
+    let dir = get_working_directory();
+
+    response.headers_mut().insert(
+        "x-current-working-directory",
+        HeaderValue::from_str(dir.short_path().as_str()).unwrap(),
+    );
+
+    response
 }

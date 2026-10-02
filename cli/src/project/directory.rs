@@ -1,6 +1,7 @@
-use std::env;
+use std::io::Error;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use std::{env, fs};
 
 #[derive(Debug, Clone)]
 pub struct WorkingDirectory {
@@ -46,16 +47,40 @@ impl WorkingDirectory {
     }
 
     pub fn config_path(&self) -> PathBuf {
-        self.project_dir().join("config.yaml")
+        self.project_dir().join("config.json")
+    }
+
+    pub fn read_config(&self) -> Result<String, Error> {
+        fs::read_to_string(self.config_path())
+    }
+
+    pub fn config_lock_path(&self) -> PathBuf {
+        self.project_dir().join("config.lock.json")
+    }
+
+    pub fn read_config_lock(&self) -> Result<String, Error> {
+        fs::read_to_string(self.config_lock_path())
     }
 
     pub fn public_keys_path(&self) -> PathBuf {
         self.project_dir().join("public-keys.json")
     }
 
-    pub fn secrets_path(&self, user_id: String, key_id: String) -> PathBuf {
+    pub fn read_public_keys(&self) -> Result<String, Error> {
+        fs::read_to_string(self.public_keys_path())
+    }
+
+    pub fn public_keys_lock_path(&self) -> PathBuf {
+        self.project_dir().join("public-keys.lock.json")
+    }
+
+    pub fn read_public_keys_lock(&self) -> Result<String, Error> {
+        fs::read_to_string(self.public_keys_lock_path())
+    }
+
+    pub fn secrets_path(&self, env: String, secret_name: String) -> PathBuf {
         self.project_dir()
-            .join(format!("secrets/{}/{}.lock", user_id, key_id))
+            .join(format!("secrets/{}/{}.json", env, secret_name))
     }
 }
 

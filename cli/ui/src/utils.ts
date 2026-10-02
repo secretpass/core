@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
@@ -24,23 +24,20 @@ export function useComplexState<T extends object>(
   return useZustandState();
 }
 
-export function useUncaughtWasmError() {
-  const [error, setError] = useState<string | null>(null);
+export async function makeRequest<T = unknown>(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) {
+  const response = await fetch(input, init);
 
-  useEffect(() => {
-    const listener = (event: ErrorEvent) => {
-      const stack = (event.error?.stack as string) || "";
-      if (stack.includes(".wasm:wasm-function[")) {
-        setError(event.message.replace("Uncaught Error: ", ""));
-      }
-    };
-    window.addEventListener("error", listener);
-    return () => {
-      window.removeEventListener("error", listener);
-    };
-  }, []);
-
-  const clear = useCallback(() => setError(null), []);
-
-  return { message: error, clear };
+  const text = await response.text();
+  return {
+    ok: response.ok,
+    status: response.status,
+    text,
+    headers: response.headers,
+    json() {
+      return JSON.parse(text) as T;
+    },
+  };
 }

@@ -13,7 +13,3 @@ pub struct SecretValue {
     pub environment: String,
     pub encrypted_value: String,
 }
-
-impl SecretValue {
-    pub fn write() {}
-}

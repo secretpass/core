@@ -1,13 +1,5 @@
-import {
-  Alert,
-  Button,
-  Description,
-  Input,
-  Label,
-  TextField,
-} from "@heroui/react";
-import { IconFingerprint } from "@tabler/icons-react";
-import { type MouseEventHandler, useMemo } from "react";
+import { Description, Input, Label, TextField } from "@heroui/react";
+import { useMemo } from "react";
 import * as z from "zod";
 import type { Stepper } from "@/components/stepper";
 import type { RegistrationState } from "@/features/setup/project/types.ts";
@@ -18,18 +10,15 @@ const profileSchema = z.object({
   user_id: z.uuidv4(),
   user_display_name: z.string().min(1),
   user_email_address: z.email(),
+  key_name: z.string().min(1),
 });
 
 export function AdminProfile({
   state,
   stepper,
-  onComplete,
-  error,
 }: {
-  error: string | null;
   state: ComplexState<RegistrationState>;
   stepper: Stepper;
-  onComplete: MouseEventHandler;
 }) {
   const is_valid = useMemo(() => profileSchema.validate(state), [state]);
   return (
@@ -71,31 +60,23 @@ export function AdminProfile({
         />
       </TextField>
 
-      {error && (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Error registering passkey</Alert.Title>
-            <Alert.Description>{error}</Alert.Description>
-          </Alert.Content>
-        </Alert>
-      )}
+      <TextField fullWidth>
+        <Label htmlFor="user_id">Passkey name</Label>
+        <Input
+          name="user_id"
+          variant="secondary"
+          spellCheck={false}
+          placeholder="Passkey name..."
+          value={state.key_name}
+          onChange={(e) => state.update({ key_name: e.target.value })}
+        />
+      </TextField>
 
       <ControlButtons
         stepper={stepper}
         previous="active"
         completeOnNext
-        completeButton={
-          <Button
-            aria-label="Register Passkey"
-            size="lg"
-            isDisabled={!is_valid}
-            onClick={onComplete}
-          >
-            <IconFingerprint />
-            Register Passkey
-          </Button>
-        }
+        next={is_valid ? "active" : "disabled"}
       />
     </div>
   );

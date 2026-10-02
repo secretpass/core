@@ -2,7 +2,8 @@ use crate::enums::EncryptionAlgorithm;
 use crate::keys::derive::{
     EccPrivateKey, EccPublicKey, KemPrivateKey, PrivateKeySeed, derive_ecc_keys, derive_kem_keys,
 };
-use crate::keys::public::{EncryptedPackage, PublicKey};
+use crate::keys::public::PublicKey;
+use crate::types::EncryptedPackage;
 use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use anyhow::anyhow;

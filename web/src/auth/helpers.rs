@@ -1,22 +1,28 @@
-use wasm_bindgen::{JsCast, UnwrapThrowExt, throw_str};
+use wasm_bindgen::JsCast;
 use web_sys::js_sys::Promise;
 use web_sys::{CredentialsContainer, PublicKeyCredential};
 
-pub fn get_credentials_container() -> CredentialsContainer {
-    let window = web_sys::window().expect_throw("Please run Secretpass in a supported browser");
+pub fn get_credentials_container() -> anyhow::Result<CredentialsContainer> {
+    let window = match web_sys::window() {
+        Some(window) => window,
+        None => {
+            return Err(anyhow::anyhow!(
+                "Please run Secretpass in a supported browser"
+            ));
+        }
+    };
     let navigator = window.navigator();
 
-    navigator.credentials()
+    Ok(navigator.credentials())
 }
 
-pub async fn parse_promise(promise: Promise) -> PublicKeyCredential {
-    let then = promise.await;
-    match then {
-        Ok(raw_result) => raw_result
-            .dyn_into::<PublicKeyCredential>()
-            .expect_throw("Error parsing passkey authentication result"),
-        Err(err) => {
-            throw_str(format!("Error processing passkey authentication: {:?}", err).as_str())
-        }
-    }
+pub async fn parse_promise(promise: Promise) -> anyhow::Result<PublicKeyCredential> {
+    let result = promise.await.map_err(|err| {
+        anyhow::anyhow!("Error processing passkey authentication result: {:?}", err)
+    })?;
+    let credential = result
+        .dyn_into::<PublicKeyCredential>()
+        .map_err(|err| anyhow::anyhow!("Error parsing passkey authentication result: {:?}", err))?;
+
+    Ok(credential)
 }

@@ -1,13 +1,11 @@
-use crate::passkeys::error::{PasskeyError, Result};
 use crate::passkeys::types::*;
-use base64::Engine;
-use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use coset::cbor::value::Value;
 use coset::{CborSerializable, CoseKey, Label};
 use p256::EncodedPoint;
 use p256::ecdsa::signature::Verifier;
 use p256::ecdsa::{Signature, VerifyingKey};
-use secretpass_core::{Passkey, PasskeyResidency, SecretpassProject};
+use secretpass_core::utils::{bin_decode, bin_encode};
+use secretpass_core::{Passkey, PasskeyResidency, SecretpassProject, SecretpassUser};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use wasm_bindgen::throw_str;
@@ -23,8 +21,8 @@ struct ClientData {
 }
 
 impl ClientData {
-    fn challenge(&self) -> Result<Vec<u8>> {
-        let challenge_bytes = BASE64_URL_SAFE_NO_PAD.decode(&self.challenge)?;
+    fn challenge(&self) -> anyhow::Result<Vec<u8>> {
+        let challenge_bytes = bin_decode(&self.challenge)?;
         if challenge_bytes.len() != CHALLENGE_LEN {
             throw_str("Invalid challenge length")
         }
@@ -44,11 +42,10 @@ struct AuthData {
     credential_data: Option<Vec<u8>>,
 }
 
-fn generate_challenge() -> Result<Vec<u8>> {
+fn generate_challenge() -> anyhow::Result<Vec<u8>> {
     let mut buf = [0u8; CHALLENGE_LEN];
-    getrandom::fill(&mut buf).map_err(|e| {
-        PasskeyError::InternalError(format!("Failed to generate random challenge: {e}"))
-    })?;
+    getrandom::fill(&mut buf)
+        .map_err(|e| anyhow::format_err!("Failed to generate random challenge: {e}"))?;
     Ok(buf.to_vec())
 }
 
@@ -56,31 +53,37 @@ fn verify_client_data(
     bytes: &[u8],
     expected_challenge: &Vec<u8>,
     expected_type: &str,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let data: ClientData = serde_json::from_slice(bytes)?;
 
     if data.challenge()? != expected_challenge.clone() {
-        return Err(PasskeyError::InvalidChallenge);
+        return Err(anyhow::anyhow!("Invalid challenge"));
     }
 
     // Due to dynamic port configuration
     if !data.origin.as_str().starts_with(CONFIG.origin) {
-        return Err(PasskeyError::OriginMismatch {
-            expected: CONFIG.origin.to_string(),
-            got: data.origin,
-        });
+        return Err(anyhow::format_err!(
+            "Origin mismatch, expected: {}, got: {}",
+            CONFIG.origin,
+            data.origin
+        ));
     }
     if data.type_ != expected_type {
-        return Err(PasskeyError::InvalidOperationType);
+        return Err(anyhow::format_err!(
+            "Invalid operation type: {}",
+            data.type_
+        ));
     }
     Ok(())
 }
 
-fn check_flags(flags: u8, project: &SecretpassProject) {
+fn check_flags(flags: u8, project: &SecretpassProject) -> anyhow::Result<()> {
     let user_present = (flags & 0x01) != 0;
     let user_verified = (flags & 0x04) != 0;
     if !user_present || !user_verified {
-        throw_str("User presence and authorization cannot be verified")
+        return Err(anyhow::anyhow!(
+            "User presence and authorization cannot be verified"
+        ));
     }
 
     if project.residency != PasskeyResidency::SyncedAllowed {
@@ -88,19 +91,21 @@ fn check_flags(flags: u8, project: &SecretpassProject) {
         let backup_completed = (flags & 0x10) != 0;
 
         if backup_eligible || backup_completed {
-            throw_str("Synced passkeys are not allowed")
+            return Err(anyhow::anyhow!("Synced passkeys are not allowed"));
         }
     }
+
+    Ok(())
 }
 
-fn parse_auth_data(raw: &[u8], project: &SecretpassProject) -> Result<AuthData> {
+fn parse_auth_data(raw: &[u8], project: &SecretpassProject) -> anyhow::Result<AuthData> {
     if raw.len() < 37 {
-        return Err(PasskeyError::InternalError("authData too short".into()));
+        return Err(anyhow::anyhow!("authData too short"));
     }
     let rp_id_hash = raw[0..32].to_vec();
     let flags = raw[32];
 
-    check_flags(flags, project);
+    check_flags(flags, project)?;
 
     let credential_data = if (flags & 0x40) != 0 {
         Some(raw[37..].to_vec())
@@ -113,25 +118,21 @@ fn parse_auth_data(raw: &[u8], project: &SecretpassProject) -> Result<AuthData> 
     })
 }
 
-fn verify_rp_id_hash(hash: &[u8]) -> Result<()> {
+fn verify_rp_id_hash(hash: &[u8]) -> anyhow::Result<()> {
     let expected = Sha256::digest(CONFIG.rp_id.as_bytes());
     if hash != expected.as_ref() as &[u8] {
-        return Err(PasskeyError::RpIdHashMismatch);
+        return Err(anyhow::anyhow!("RP ID hash mismatch"));
     }
     Ok(())
 }
 
-fn extract_credential(data: &[u8]) -> Result<(&[u8], &[u8])> {
+fn extract_credential(data: &[u8]) -> anyhow::Result<(&[u8], &[u8])> {
     if data.len() < 18 {
-        return Err(PasskeyError::InternalError(
-            "Credential Data too short".into(),
-        ));
+        return Err(anyhow::anyhow!("Credential Data too short"));
     }
     let cred_id_len = u16::from_be_bytes(data[16..18].try_into().unwrap()) as usize;
     if data.len() < 18 + cred_id_len {
-        return Err(PasskeyError::InternalError(
-            "Credential ID incomplete".into(),
-        ));
+        return Err(anyhow::anyhow!("Credential ID incomplete"));
     }
     let cred_id = &data[18..18 + cred_id_len];
     let pub_key_cbor = &data[18 + cred_id_len..];
@@ -142,36 +143,35 @@ fn verify_p256_signature(
     pub_key_cbor: &[u8],
     signed_data: &[u8],
     signature_der: &[u8],
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let cose_key = CoseKey::from_slice(pub_key_cbor)
-        .map_err(|e| PasskeyError::InternalError(format!("Invalid COSE key: {e}")))?;
+        .map_err(|e| anyhow::format_err!("Invalid COSE key: {e}"))?;
 
     let x = match cose_key.params.iter().find(|(k, _)| k == &Label::Int(-2)) {
         Some((_, Value::Bytes(b))) => b,
-        _ => return Err(PasskeyError::InternalError("Missing x coordinate".into())),
+        _ => return Err(anyhow::anyhow!("Missing x coordinate")),
     };
     let y = match cose_key.params.iter().find(|(k, _)| k == &Label::Int(-3)) {
         Some((_, Value::Bytes(b))) => b,
-        _ => return Err(PasskeyError::InternalError("Missing y coordinate".into())),
+        _ => return Err(anyhow::anyhow!("Missing y coordinate")),
     };
 
     if x.len() != 32 || y.len() != 32 {
-        return Err(PasskeyError::InternalError(
-            "Invalid coordinate length".into(),
-        ));
+        return Err(anyhow::anyhow!("Invalid coordinate length"));
     }
 
     let encoded_point =
         EncodedPoint::from_affine_coordinates(x.as_slice().into(), y.as_slice().into(), false);
     let verifying_key = VerifyingKey::from_encoded_point(&encoded_point)
-        .map_err(|e| PasskeyError::InternalError(format!("Invalid P-256 key: {e}")))?;
+        .map_err(|e| anyhow::format_err!("Invalid P-256 key: {e}"))?;
 
     let signature = Signature::from_der(signature_der)
-        .map_err(|e| PasskeyError::InvalidSignature(e.to_string()))?;
+        .map_err(|e| anyhow::format_err!("Error parsing signature: {e}"))?;
 
     verifying_key
         .verify(signed_data, &signature)
-        .map_err(|e| PasskeyError::InvalidSignature(e.to_string()))
+        .map_err(|e| anyhow::format_err!("Invalid signature: {e}"))?;
+    Ok(())
 }
 
 // Core WebAuthn Flows
@@ -182,10 +182,8 @@ fn verify_p256_signature(
 /// It also saves the registration session state to the provided `store`.
 pub async fn start_registration(
     project: &SecretpassProject,
-    user_id: &str,
-    username: &str,
-    display_name: &str,
-) -> Result<PasskeyCreationOptions> {
+    user: &SecretpassUser,
+) -> anyhow::Result<PasskeyCreationOptions> {
     let challenge = generate_challenge()?;
 
     let options = PasskeyCreationOptions {
@@ -194,9 +192,9 @@ pub async fn start_registration(
             id: CONFIG.rp_id.to_string(),
         },
         user: UserEntity {
-            id: user_id.to_string(),
-            name: username.to_string(),
-            display_name: display_name.to_string(),
+            id: user.id.clone(),
+            name: user.username.clone(),
+            display_name: user.name.clone(),
         },
         challenge,
         pub_key_cred_params: vec![PubKeyCredParam {
@@ -225,7 +223,7 @@ pub fn finish_registration(
     project: &SecretpassProject,
     options: &PasskeyCreationOptions,
     response: RegistrationResponse,
-) -> Result<Passkey> {
+) -> anyhow::Result<Passkey> {
     verify_client_data(
         &response.response.client_data_json,
         &options.challenge,
@@ -234,22 +232,20 @@ pub fn finish_registration(
 
     // Parse attestation object (CBOR)
     let att_obj: Value = ciborium::from_reader(response.response.attestation_object.as_slice())
-        .map_err(|e| PasskeyError::InternalError(format!("Invalid attestationObject CBOR: {e}")))?;
+        .map_err(|e| anyhow::format_err!(format!("Invalid attestationObject CBOR: {e}")))?;
 
     let Value::Map(m) = &att_obj else {
-        return Err(PasskeyError::InternalError(
-            "Invalid attestation object structure".into(),
-        ));
+        return Err(anyhow::anyhow!("Invalid attestation object structure"));
     };
 
     let (_, auth_data_value) = m
         .iter()
         .find(|(k, _)| k.as_text().is_some_and(|s| s == "authData"))
-        .ok_or_else(|| PasskeyError::InternalError("authData missing".into()))?;
+        .ok_or_else(|| anyhow::anyhow!("authData missing"))?;
 
     let auth_data_bytes = auth_data_value
         .as_bytes()
-        .ok_or_else(|| PasskeyError::InternalError("authData not bytes".into()))?;
+        .ok_or_else(|| anyhow::anyhow!("authData not bytes"))?;
 
     // Verify authData
     let auth_data = parse_auth_data(auth_data_bytes, project)?;
@@ -258,21 +254,21 @@ pub fn finish_registration(
     // Extract credential
     let cred_bytes = auth_data
         .credential_data
-        .ok_or_else(|| PasskeyError::InternalError("Attested Credential Data missing".into()))?;
+        .ok_or_else(|| anyhow::anyhow!("Attested Credential Data missing"))?;
     let (cred_id, pub_key_cbor) = extract_credential(&cred_bytes)?;
     // Validate the public key parses
     CoseKey::from_slice(pub_key_cbor)
-        .map_err(|e| PasskeyError::InternalError(format!("Invalid Public Key CBOR: {e}")))?;
+        .map_err(|e| anyhow::format_err!("Invalid Public Key CBOR: {e}"))?;
 
     // Encode for storage
-    let cred_id_b64 = BASE64_URL_SAFE_NO_PAD.encode(cred_id);
-    let pub_key_b64 = BASE64_URL_SAFE_NO_PAD.encode(pub_key_cbor);
+    let cred_id_b64 = bin_encode(cred_id);
+    let pub_key_b64 = bin_encode(pub_key_cbor);
 
     let passkey = Passkey {
         id: cred_id_b64,
         public_key: pub_key_b64,
         user_id: options.user.id.clone(),
-        user_name: options.user.name.clone(),
+        username: options.user.name.clone(),
         created_at: chrono::Utc::now().to_rfc3339(),
     };
 
@@ -283,7 +279,7 @@ pub fn finish_registration(
 ///
 /// Returns the options that must be sent to the WebAuthn client (`navigator.credentials.get`).
 /// It saves a login session state keyed by the challenge.
-pub fn start_login() -> Result<PasskeyRequestOptions> {
+pub fn start_login() -> anyhow::Result<PasskeyRequestOptions> {
     let challenge = generate_challenge()?;
 
     let options = PasskeyRequestOptions {
@@ -306,7 +302,7 @@ pub async fn finish_login(
     passkey: &Passkey,
     challenge: &Vec<u8>,
     response: LoginResponse,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     // Full clientDataJSON verification
     verify_client_data(
         &response.response.client_data_json,
@@ -320,10 +316,10 @@ pub async fn finish_login(
 
     // Verify user handle if present
     if let Some(uh_bytes) = response.response.user_handle {
-        let uid_str = String::from_utf8(uh_bytes)
-            .map_err(|_| PasskeyError::InternalError("Invalid userHandle utf8".into()))?;
+        let uid_str =
+            String::from_utf8(uh_bytes).map_err(|_| anyhow::anyhow!("Invalid userHandle utf8"))?;
         if uid_str != passkey.user_id {
-            return Err(PasskeyError::UserHandleMismatch);
+            return Err(anyhow::anyhow!("User Handle mismatch"));
         }
     }
 
@@ -333,7 +329,7 @@ pub async fn finish_login(
     signed_data.extend_from_slice(&client_data_hash);
 
     verify_p256_signature(
-        &passkey.public_key_bytes(),
+        &passkey.public_key_bytes()?,
         &signed_data,
         &response.response.signature,
     )?;

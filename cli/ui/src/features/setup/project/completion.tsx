@@ -1,121 +1,123 @@
-import { Alert, Button, ProgressCircle } from "@heroui/react";
-import {
-  IconArrowRight,
-  IconFingerprint,
-  IconFingerprintScan,
-  IconFolder,
-  IconShieldCog,
-} from "@tabler/icons-react";
+import { Alert, Button, Description } from "@heroui/react";
+import { IconFingerprint, IconFolder } from "@tabler/icons-react";
 import { useCallback, useState } from "react";
+import { LoadingCircle } from "@/components/loader";
+import { CWD_HEADER } from "@/constants";
 import {
-  authorize_and_build_public_key,
-  type LoginParams,
-  type Passkey,
+  type RegistrationParams,
+  register_user,
   type SecretpassProject,
+  type SecretpassUser,
+  type StoredPublicKey,
 } from "@/core/web";
 import type { RegistrationState } from "@/features/setup/project/types.ts";
-import { useSecretManager } from "@/manager";
-import { type ComplexState, useUncaughtWasmError } from "@/utils.ts";
+import type { SecretMangerState } from "@/manager";
+import type { SecretManagerConfig } from "@/types";
+import { type ComplexState, makeRequest } from "@/utils.ts";
 
 interface CompletionScreenProps {
   state: ComplexState<RegistrationState>;
-  passkey: Passkey;
-  project: SecretpassProject;
+  directory: string;
+  onAuthComplete: (state: SecretMangerState) => void;
 }
 
 export function CompletionScreen({
   state,
-  passkey,
-  project,
+  onAuthComplete,
+  directory,
 }: CompletionScreenProps) {
-  const manager = useSecretManager();
   const [is_loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const wasm_error = useUncaughtWasmError();
 
   const completeRegistration = useCallback(() => {
-    wasm_error.clear();
     setError(null);
-    const params: LoginParams = {
-      passkey,
-      project,
+
+    const project: SecretpassProject = {
+      id: state.id,
+      name: state.project_name,
+      description: state.description,
+      algorithm: state.algorithm,
+      residency: state.residency,
+      created_at: state.created,
     };
-    authorize_and_build_public_key(
-      JSON.stringify(params),
-      `${state.user_display_name} - Passkey 0`,
-    )
-      .then((public_key_json) => {
-        const public_key = JSON.parse(public_key_json);
-        const data = {
-          project,
-          environments: state.environments,
-          user: {
-            id: state.user_id,
-            username: state.user_email_address,
-            name: state.user_display_name,
-            level: "Admin",
-            added_on: state.created,
-          },
-          public_key,
-        };
 
+    const user: SecretpassUser = {
+      id: state.user_id,
+      username: state.user_email_address,
+      name: state.user_display_name,
+      level: "Admin",
+      created_at: state.created,
+    };
+    const params: RegistrationParams = {
+      name: state.key_name,
+      project,
+      user,
+    };
+
+    register_user(JSON.stringify(params))
+      .then(async (public_key_json) => {
         setLoading(true);
+        const public_key: StoredPublicKey = JSON.parse(public_key_json);
 
-        fetch("/api/config", {
-          method: "POST",
-          body: JSON.stringify(data),
-          headers: {
-            "Content-Type": "application/json",
+        const response = await makeRequest<SecretManagerConfig>(
+          "/api/project",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              project,
+              user,
+              environments: state.environments,
+              public_key,
+            }),
+            headers: {
+              "Content-Type": "application/json",
+            },
           },
-        })
-          .then((response) => {
-            if (response.ok) {
-              return response.json();
-            }
-            setError("Failed to create project");
-          })
-          .then((config) => {
-            if (config) {
-              manager.update({ config });
-            }
-          })
-          .finally(() => setLoading(false));
+        );
+
+        if (response.ok) {
+          const config = response.json();
+          const directory = response.headers.get(CWD_HEADER) as string;
+          onAuthComplete({
+            config,
+            directory,
+            public_key,
+            public_keys: [public_key],
+            user,
+          });
+        } else {
+          setError(`Failed to create project: ${response.text}`);
+        }
       })
-      .catch((error) => {
-        setError(String(error));
-      });
-  }, [state, passkey, project, manager.update, wasm_error.clear]);
+      .catch((err) => {
+        setError(String(err));
+      })
+      .finally(() => setLoading(false));
+  }, [state, onAuthComplete]);
 
   return (
     <div className="flex flex-col justify-center items-center gap-10 grow">
-      <h1 className="text-2xl text-muted">
-        Create{" "}
-        <span className="font-semibold text-foreground">
-          {state.project_name} Project Name
-        </span>{" "}
-      </h1>
-      <div className="flex items-center gap-16">
-        <div className="flex flex-col gap-4 items-center">
-          <IconFingerprint className="size-10 text-success" />
-          <div className="text-muted">Admin Registration</div>
-        </div>
-        <IconArrowRight className="w-10 text-muted" />
-        <div className="flex flex-col gap-4 items-center">
-          <IconShieldCog className="size-10 text-warning" />
-          <div className="text-muted">Save Project</div>
-        </div>
+      <div className="text-center">
+        <h1 className="text-2xl text-muted">
+          Create{" "}
+          <span className="font-semibold text-foreground">
+            {state.project_name}
+          </span>{" "}
+        </h1>
+        <Description>{state.description}</Description>
       </div>
+
       <kbd className="font-mono text-white bg-black px-6 py-4 flex items-center gap-4">
         <IconFolder />
-        {manager.directory}/.spass
+        {directory}/.spass
       </kbd>
 
-      {(error || wasm_error.message) && (
+      {error && (
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>Error registering passkey</Alert.Title>
-            <Alert.Description>{error || wasm_error.message}</Alert.Description>
+            <Alert.Description>{error}</Alert.Description>
           </Alert.Content>
         </Alert>
       )}
@@ -126,14 +128,9 @@ export function CompletionScreen({
         aria-label="Register Passkey"
         size="lg"
       >
-        {!is_loading && <IconFingerprintScan />}
+        {!is_loading && <IconFingerprint />}
         {is_loading && (
-          <ProgressCircle aria-label="Loading" size="sm" isIndeterminate>
-            <ProgressCircle.Track>
-              <ProgressCircle.TrackCircle />
-              <ProgressCircle.FillCircle />
-            </ProgressCircle.Track>
-          </ProgressCircle>
+          <LoadingCircle aria-label="Loading" size="sm" isIndeterminate />
         )}
         Authorize and Create Project
       </Button>

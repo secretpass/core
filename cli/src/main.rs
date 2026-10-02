@@ -80,13 +80,14 @@ async fn main() {
             }
 
             start_manager(cli.project_dir, cli.cloud, cli.cloud_origin.clone())
+                .unwrap()
                 .await
                 .unwrap();
         }
         Commands::Run { image, target } => {
             let future = start_manager(cli.project_dir, cli.cloud, cli.cloud_origin.clone());
 
-            future.await.unwrap();
+            future.unwrap().await.unwrap();
         }
         Commands::Direct {
             export,

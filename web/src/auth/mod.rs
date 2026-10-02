@@ -3,5 +3,5 @@ mod login;
 mod mapping;
 mod registration;
 
-pub use login::login_user;
-pub use registration::register_user;
+pub use login::{LoginParams, login_user_bounded};
+pub use registration::{RegistrationParams, register_user_bounded};

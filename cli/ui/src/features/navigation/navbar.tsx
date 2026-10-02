@@ -1,14 +1,57 @@
-import { Button, Link } from "@heroui/react";
+import { Button, IconChevronDown, Link } from "@heroui/react";
 import {
+  IconBook2,
+  IconBrandDiscord,
+  IconBrandGithub,
+  IconBrandMedium,
+  IconBrandReddit,
+  IconBrandSlack,
   IconCloudFilled,
   IconDeviceLaptop,
   IconExternalLink,
   IconMenu,
   IconX,
+  type TablerIcon,
 } from "@tabler/icons-react";
 import { useState } from "react";
 import { Logo } from "@/components";
 import { ThemeToggle } from "@/features/theme/theme-toggle";
+
+const community_links: { label: string; Icon: TablerIcon; href: string }[] = [
+  {
+    label: "Slack",
+    Icon: IconBrandSlack,
+    href: "https://slack.com",
+  },
+  {
+    label: "Github",
+    Icon: IconBrandGithub,
+    href: "https://github.com",
+  },
+  {
+    label: "Reddit",
+    Icon: IconBrandReddit,
+    href: "https://reddit.com",
+  },
+  {
+    label: "Discord",
+    Icon: IconBrandDiscord,
+    href: "https://discord.com",
+  },
+];
+
+const resources_links: { label: string; Icon: TablerIcon; href: string }[] = [
+  {
+    label: "Docs",
+    Icon: IconBook2,
+    href: "https://secretpass.cloud/docs",
+  },
+  {
+    label: "Blog",
+    Icon: IconBrandMedium,
+    href: "https://medium.com/secretpass",
+  },
+];
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -27,6 +70,14 @@ export function Navbar() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
+            <Link
+              href="/docs"
+              target="_blank"
+              className="text-sm flex items-center gap-2 font-medium hover:text-primary no-underline"
+            >
+              Community
+              <IconChevronDown />
+            </Link>
             <Link
               href="/docs"
               target="_blank"

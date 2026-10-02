@@ -8,3 +8,5 @@ export enum OperationMode {
   Local = "Local",
   Cloud = "Cloud",
 }
+
+export const CWD_HEADER = "x-current-working-directory";

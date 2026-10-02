@@ -1,80 +1,71 @@
 use crate::auth::helpers::{get_credentials_container, parse_promise};
-use crate::auth::mapping::{allowed_credentials, map_browser_passkey_authentication};
+use crate::auth::mapping::{
+    allowed_credentials, build_credential_request_extensions, map_browser_passkey_authentication,
+};
 use crate::passkeys::types::{LoginResponse, PasskeyRequestOptions, PrfResults};
 use crate::passkeys::{finish_login, start_login};
 use crate::session::SecureSession;
-use secretpass_core::{Passkey, SecretpassProject};
+use secretpass_core::{SecretpassProject, SecretpassUser, StoredPublicKey};
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
 use tsify::Tsify;
-use wasm_bindgen::UnwrapThrowExt;
-use web_sys::js_sys::Uint8Array;
 use web_sys::{
-    AuthenticationExtensionsClientInputs, AuthenticationExtensionsPrfInputs,
-    AuthenticationExtensionsPrfValues, CredentialRequestOptions, PublicKeyCredentialRequestOptions,
-    UserVerificationRequirement,
+    CredentialRequestOptions, PublicKeyCredentialRequestOptions, UserVerificationRequirement,
 };
 
 #[derive(Debug, Deserialize, Tsify)]
 pub struct LoginParams {
-    project: SecretpassProject,
-    passkey: Passkey,
+    pub(crate) project: SecretpassProject,
+    pub(crate) user: SecretpassUser,
+    pub(crate) public_keys: Vec<StoredPublicKey>,
 }
 
-pub async fn login_user(params: &str) -> SecureSession {
-    let params: LoginParams =
-        serde_json::from_str(params).expect_throw("Error parsing login parameters");
-    let project = params.project;
-    let passkey = params.passkey;
-
-    let login_options = start_login().expect_throw("Error starting login process");
+pub async fn login_user_bounded(
+    params: LoginParams,
+) -> anyhow::Result<(StoredPublicKey, SecureSession)> {
+    let login_options = start_login()?;
 
     let challenge = login_options.challenge.clone();
 
-    let (prf_results, login_response) = browser_user_login(&project, &passkey, login_options).await;
+    let (public_key, prf_results, login_response) =
+        browser_user_login(&params, login_options).await?;
 
-    finish_login(&project, &passkey, &challenge, login_response)
-        .await
-        .expect_throw("Error finishing login process");
+    let passkey = public_key.passkey.clone().ok_or_else(|| {
+        anyhow::format_err!(
+            "Internal error: machine key({}) used for login",
+            public_key.id
+        )
+    })?;
 
-    SecureSession::new(project, passkey, prf_results)
+    finish_login(&params.project, &passkey, &challenge, login_response).await?;
+
+    let session = SecureSession::new(params.project.algorithm, prf_results)?;
+
+    Ok((public_key, session))
 }
 
 async fn browser_user_login(
-    project: &SecretpassProject,
-    passkey: &Passkey,
+    params: &LoginParams,
     login_options: PasskeyRequestOptions,
-) -> (PrfResults, LoginResponse) {
+) -> anyhow::Result<(StoredPublicKey, PrfResults, LoginResponse)> {
     let mut challenge = login_options.challenge.clone();
 
-    let prf_value =
-        AuthenticationExtensionsPrfValues::new_with_u8_array(&encode_prf_salt(project.prf_salt()));
-    prf_value.set_second_u8_array(&encode_prf_salt(passkey.prf_salt()));
-
-    let prf_extension = AuthenticationExtensionsPrfInputs::new();
-    prf_extension.set_eval(&prf_value);
-
-    let extensions = AuthenticationExtensionsClientInputs::new();
-    extensions.set_prf(&prf_extension);
+    let extensions = build_credential_request_extensions(&params.project, &params.user);
 
     let pk_options = PublicKeyCredentialRequestOptions::new_with_u8_slice(&mut challenge);
     pk_options.set_rp_id(login_options.rp_id.as_str());
-    pk_options.set_allow_credentials(&allowed_credentials(passkey));
+    pk_options.set_allow_credentials(&allowed_credentials(&params.public_keys)?);
     pk_options.set_user_verification(UserVerificationRequirement::Required);
     pk_options.set_extensions(&extensions);
 
     let options = CredentialRequestOptions::new();
     options.set_public_key(&pk_options);
 
-    let promise = get_credentials_container()
-        .get_with_options(&options)
-        .expect_throw("Error getting the passkey");
+    let promise = match get_credentials_container()?.get_with_options(&options) {
+        Ok(promise) => promise,
+        Err(err) => return Err(anyhow::format_err!("Error getting passkey: {:?}", err)),
+    };
 
-    let credential = parse_promise(promise).await;
+    let credential = parse_promise(promise).await?;
 
-    map_browser_passkey_authentication(credential)
-}
-
-fn encode_prf_salt(value: String) -> Uint8Array {
-    Uint8Array::new_from_slice(&Sha256::digest(value.as_bytes()))
+    map_browser_passkey_authentication(credential, &params.public_keys)
 }

@@ -33,4 +33,6 @@ export interface RegistrationState {
   user_id: string;
   user_display_name: string;
   user_email_address: string;
+
+  key_name: string;
 }

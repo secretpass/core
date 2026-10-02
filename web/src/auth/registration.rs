@@ -1,55 +1,45 @@
-use crate::auth::mapping::map_browser_passkey_registration_response;
-use crate::passkeys::types::{PasskeyCreationOptions, RegistrationResponse};
+use crate::auth::helpers::{get_credentials_container, parse_promise};
+use crate::auth::mapping::{
+    build_credential_request_extensions, map_browser_passkey_registration_response,
+};
+use crate::passkeys::types::{PasskeyCreationOptions, PrfResults, RegistrationResponse};
 use crate::passkeys::{finish_registration, start_registration};
+use crate::session::SecureSession;
+use secretpass_core::{PasskeyResidency, SecretpassProject, SecretpassUser, StoredPublicKey};
 use serde::Deserialize;
 use tsify::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsValue, UnwrapThrowExt, throw_str};
-
-use crate::auth::helpers::{get_credentials_container, parse_promise};
-use secretpass_core::{PasskeyResidency, SecretpassProject};
+use wasm_bindgen::JsValue;
 use web_sys::js_sys::{Array as JsArray, Object as JsObject, Reflect as JsReflect};
 use web_sys::{
-    AttestationConveyancePreference, AuthenticationExtensionsClientInputs,
-    AuthenticationExtensionsPrfInputs, AuthenticatorAttachment, AuthenticatorSelectionCriteria,
+    AttestationConveyancePreference, AuthenticatorAttachment, AuthenticatorSelectionCriteria,
     CredentialCreationOptions, PublicKeyCredentialCreationOptions, PublicKeyCredentialRpEntity,
     PublicKeyCredentialUserEntity, UserVerificationRequirement,
 };
 
 #[derive(Debug, Deserialize, Tsify)]
-struct RegistrationParams {
+pub struct RegistrationParams {
+    name: String,
     project: SecretpassProject,
-    user_id: String,
-    email_address: String,
-    display_name: String,
+    user: SecretpassUser,
 }
 
-#[wasm_bindgen]
-pub async fn register_user(params: &str) -> String {
-    let params: RegistrationParams =
-        serde_json::from_str(params).expect_throw("Error parsing registration parameters");
-    let project = &params.project;
-    let options = start_registration(
-        project,
-        &params.user_id,
-        &params.email_address,
-        &params.display_name,
-    )
-    .await
-    .expect_throw("Error starting passkey registration");
+pub async fn register_user_bounded(params: RegistrationParams) -> anyhow::Result<StoredPublicKey> {
+    let options = start_registration(&params.project, &params.user).await?;
 
-    let reg_response = browser_user_registration(project, &options).await;
+    let (prf_results, reg_response) = browser_user_registration(&params, &options).await?;
 
-    match finish_registration(project, &options, reg_response) {
-        Ok(passkey) => serde_json::to_string(&passkey).expect_throw("Error serializing passkey"),
-        Err(err) => throw_str(&format!("Error completing passkey registration: {:?}", err)),
-    }
+    let passkey = finish_registration(&params.project, &options, reg_response)?;
+
+    let session = SecureSession::new(params.project.algorithm, prf_results)?;
+
+    Ok(session.build_public_key(params.name, &passkey))
 }
 
 async fn browser_user_registration(
-    project: &SecretpassProject,
+    params: &RegistrationParams,
     create_options: &PasskeyCreationOptions,
-) -> RegistrationResponse {
+) -> anyhow::Result<(PrfResults, RegistrationResponse)> {
     let rp = PublicKeyCredentialRpEntity::new(&create_options.rp.name);
     let user_id = create_options.user.id.clone();
     let mut user_id_bytes: Vec<u8> = user_id.into_bytes();
@@ -60,9 +50,7 @@ async fn browser_user_registration(
     );
 
     // Request PRF extension during key creation, this is a dealbreaker if not supported
-    let extensions = AuthenticationExtensionsClientInputs::new();
-    let prf_extension = AuthenticationExtensionsPrfInputs::new();
-    extensions.set_prf(&prf_extension);
+    let extensions = build_credential_request_extensions(&params.project, &params.user);
 
     rp.set_id(&create_options.rp.id);
     let mut challenge = create_options.challenge.clone();
@@ -80,13 +68,13 @@ async fn browser_user_registration(
 
     let selection = AuthenticatorSelectionCriteria::new();
     selection.set_user_verification(UserVerificationRequirement::Required);
-    if project.residency == PasskeyResidency::HardwareKey {
+    if params.project.residency == PasskeyResidency::HardwareKey {
         selection.set_authenticator_attachment(AuthenticatorAttachment::Platform);
     }
 
     // We will provide allowed credentials + username for every project, we don't need the key to be discoverable
-    if project.residency == PasskeyResidency::OnDevice
-        || project.residency == PasskeyResidency::HardwareKey
+    if params.project.residency == PasskeyResidency::OnDevice
+        || params.project.residency == PasskeyResidency::HardwareKey
     {
         selection.set_require_resident_key(true);
         selection.set_resident_key("required");
@@ -100,11 +88,11 @@ async fn browser_user_registration(
     let options = CredentialCreationOptions::new();
     options.set_public_key(&pk_options);
 
-    let promise = get_credentials_container()
+    let promise = get_credentials_container()?
         .create_with_options(&options)
-        .expect_throw("Error creating passkey");
+        .map_err(|_| anyhow::anyhow!("Error creating passkey"))?;
 
-    let credential = parse_promise(promise).await;
+    let credential = parse_promise(promise).await?;
 
     map_browser_passkey_registration_response(credential)
 }
