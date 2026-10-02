@@ -36,7 +36,7 @@ sequenceDiagram
     participant App@{"type": "control"} as Web App(javascript)
     participant Cli@{"type": "control"} as Spass Cli
     User ->> App: Opens Secret Manager Interface
-    App <<->> Cli: [GET]<br/>- /api/project<br/><br/>Response:<br/>- Project does not exist
+    App <<->> Cli: [GET]<br/>- /api/project<br/>---<br/>Response:<br/>- Project does not exist
     App ->> User: Presents project creation interface
     User ->> App: Submits all project data
     App -->> Core: Request creation of a passkey
@@ -46,7 +46,7 @@ sequenceDiagram
     Vault <<->> User: Request approval
     Vault ->> Core: Result:<br/> - Authorization signature<br/> - Passkey public key
     deactivate Vault
-    Core -->> App: Action:<br/>- Verify signature<br/><br/>Result:<br/>- Passkey public key
+    Core -->> App: Action:<br/>- Verify signature<br/>---<br/>Result:<br/>- Passkey public key
     deactivate Core
     App ->> User: Presents confirmation interface
     User ->> App: Confirm project creation
@@ -57,9 +57,9 @@ sequenceDiagram
     Vault <<->> User: Request approval
     Vault ->> Core: Result:<br/> - Authorization signature<br/> - PRF results
     deactivate Vault
-    Core -->> App: Action:<br/>- Verify signature<br/>- Derive private key from PRF results<br/>- Generate public key from private key<br/><br/>Result:<br/>- Generated public key
+    Core -->> App: Action:<br/>- Verify signature<br/>- Derive private key from PRF results<br/>- Generate public key from private key<br/>---<br/>Result:<br/>- Generated public key
     deactivate Core
-    App <<->> Cli: [POST]<br/>- /api/project<br/><br/>Repnse:<br/>- Created project
+    App <<->> Cli: [POST]<br/>- /api/project<br/>---<br/>Repnse:<br/>- Created project
 ```
 
 ## User Login
@@ -80,13 +80,13 @@ sequenceDiagram
     participant App@{"type": "control"} as Web App
     participant Cli@{"type": "control"} as Spass Cli
     User ->> App: Opens Secret Manager Interface
-    App <<->> Cli: [GET]<br/>- /api/project<br/><br/>Response:<br/>- Loaded project details only
+    App <<->> Cli: [GET]<br/>- /api/project<br/>---<br/>Response:<br/>- Loaded project details only
     App ->> User: Presents login interface
     User ->> App: Enters their username
-    App <<->> Cli: [GET]<br/>- /api/user/keys?username=<br/><br/>Response:<br/>- List of user keys
+    App <<->> Cli: [GET]<br/>- /api/user/keys?username=<br/>---<br/>Response:<br/>- List of user keys
     App ->> User: Presents key selection UI
     User ->> App: Selects a key
-    App <<->> Cli: [GET]<br/>- /api/configs/encrypted/:key_id<br/><br/>Response:<br/>- Encrypted project config<br/>- Encrypted public keys
+    App <<->> Cli: [GET]<br/>- /api/configs/encrypted/:key_id<br/>---<br/>Response:<br/>- Encrypted project config<br/>- Encrypted public keys
     App -->> Core: Request:<br/>- Authorization<br/>- Decryption of project config<br/>- Decryption of public keys
     activate Core
     Core ->> Vault: Request authorization with PRF extension
@@ -94,7 +94,7 @@ sequenceDiagram
     Vault <<->> User: Request approval
     Vault ->> Core: Result:<br/> - Authorization signature<br/> - PRF results
     deactivate Vault
-    Core -->> App: Action:<br/>- Verify authorization<br/>- Derive private key from PRF results<br/>- Decrypt project config<br/>- Decrypt public keys config<br/>- Calculate config and keys hash<br/><br/>Result:<br/>- Decrypted configs<br/>- Configs hash
+    Core -->> App: Action:<br/>- Verify authorization<br/>- Derive private key from PRF results<br/>- Decrypt project config<br/>- Decrypt public keys config<br/>- Calculate config and keys hash<br/>---<br/>Result:<br/>- Decrypted configs<br/>- Configs hash
     deactivate Core
     App ->> User: Allow the user to interact based on decoded config
     App <<-->> Cli: Future requests must use original config hash as `Authorization`
@@ -118,7 +118,7 @@ sequenceDiagram
     participant App@{"type": "control"} as Web App
     participant Cli@{"type": "control"} as Spass Cli
     User ->> App: Clicks View Secret
-    App <<->> Cli: [GET]<br/>- /api/secrets/[env]/[name]/key/:key-id<br/><br/>Response:<br/>- Encrypted secret for the key
+    App <<->> Cli: [GET]<br/>- /api/secrets/[env]/[name]/key/:key-id<br/>---<br/>Response:<br/>- Encrypted secret for the key
     App -->> Core: Request:<br/>- Authorization<br/>- Decrypted secret for the key
     activate Core
     Core ->> Vault: Request authorization with PRF extension
@@ -126,7 +126,7 @@ sequenceDiagram
     Vault <<->> User: Request approval
     Vault ->> Core: Result:<br/>- Authorization signature<br/>- PRF results
     deactivate Vault
-    Core -->> App: Action:<br/>- Verify signature<br/>- Derive private key from PRF<br/>- Decrypt Secret with private key<br/><br/>Result:<br/>- Decrypted secret value
+    Core -->> App: Action:<br/>- Verify signature<br/>- Derive private key from PRF<br/>- Decrypt Secret with private key<br/>---<br/>Result:<br/>- Decrypted secret value
     deactivate Core
     App ->> User: Display plain text secret
 ```
@@ -156,7 +156,7 @@ sequenceDiagram
     Vault <<->> User: Request approval
     Vault ->> Core: Result:<br/>- Authorization signature
     deactivate Vault
-    Core -->> App: Action:<br/>- Verify signature<br/>- Encrypt secret with all public keys<br/><br/>Result:<br/>- Encrypted secret values
+    Core -->> App: Action:<br/>- Verify signature<br/>- Encrypt secret with all public keys<br/>---<br/>Result:<br/>- Encrypted secret values
     deactivate Core
     App ->> Cli: [POST]<br/>- /api/secrets/[env]/[name]
 ```
@@ -231,7 +231,7 @@ sequenceDiagram
     Vault -->> Core: Result
     Vault ->> Core: Result:<br/>- Authorization signature<br/>- PRF results
     deactivate Vault
-    Core -->> App: Action<br/>- Verify signature<br/>- Derive private key from pRF results<br/>- Generate public key from private key<br/><br/>Result:<br/>- Generated public key
+    Core -->> App: Action<br/>- Verify signature<br/>- Derive private key from pRF results<br/>- Generate public key from private key<br/>---<br/>Result:<br/>- Generated public key
     deactivate Core
     App ->> User: Presents the newly generated public key
     Note over User, App: The user needs to share the generated public key with the admin. The key is not sensitive and can be shared over open channels
@@ -257,7 +257,7 @@ sequenceDiagram
     App ->> User: Presents new key addition interface
     Note over App, User: This assumes that the admin already received the public key generated from the user
     User ->> App: - Enters the config shared by the user<br/>- Confirms/modifies user access<br/>Selects confirm addition
-    App <<->> Cli: - [GET]<br/>- /api/secrets/encrypted/key_id?env=env1,env2<br/><br/>Response:<br/>- Encrypted secrets for the admin key<br/>- Filtered based on what the user can access
+    App <<->> Cli: - [GET]<br/>- /api/secrets/encrypted/key_id?env=env1,env2<br/>---<br/>Response:<br/>- Encrypted secrets for the admin key<br/>- Filtered based on what the user can access
     App -->> Core: Request:<br/>- Authorization with PRF<br/>- Decryption of secrets to be shared<br/>- Encryption of secrets with the new public key
     activate Core
     Core ->> Vault: Request authorization with PRF extension
@@ -265,7 +265,7 @@ sequenceDiagram
     Vault <<->> User: Request approval
     Vault ->> Core: Result:<br/>- Authorization signature<br/>- PRF results
     deactivate Vault
-    Core -->> App: Action:<br/>- Verify signature<br/>- Derive admin private key from PRF<br/>- Decrypt secrets with admin private key<br/>- Encrypt decrypted secrets with the new public key<br/><br/>Result:<br/>- Secrets encrypted with the new public key
+    Core -->> App: Action:<br/>- Verify signature<br/>- Derive admin private key from PRF<br/>- Decrypt secrets with admin private key<br/>- Encrypt decrypted secrets with the new public key<br/>---<br/>Result:<br/>- Secrets encrypted with the new public key
     deactivate Core
     App <<->> Cli: [POST]<br/>- /api/keys<br/>- User and public key details<br/>- Encrypted secrets
     Note over User, App: Once synced, the user can access the project using their passkey
@@ -290,8 +290,8 @@ sequenceDiagram
     User ->> App: - Select update user<br/>- Select new environments to add<br/>- Confirm Action
 
     par App to Cli
-        App <<->> Cli: - [GET]<br/>- /api/secrets/encrypted/key_id?env=env1,env2<br/><br/>Response:<br/>- Encrypted secrets for the admin key<br/>- Filtered based on what the new environments introduced
-        App <<->> Cli: - [GET]<br/>- /api/keys/[user-id]<br/><br/>Response:<br/>- Public keys for the user
+        App <<->> Cli: - [GET]<br/>- /api/secrets/encrypted/key_id?env=env1,env2<br/>---<br/>Response:<br/>- Encrypted secrets for the admin key<br/>- Filtered based on what the new environments introduced
+        App <<->> Cli: - [GET]<br/>- /api/keys/[user-id]<br/>---<br/>Response:<br/>- Public keys for the user
     end
 
     App -->> Core: Request:<br/>- Authorization with PRF<br/>- Decryption of secrets to be shared<br/>- Encryption of secrets with the user's public keys
@@ -301,7 +301,7 @@ sequenceDiagram
     Vault <<->> User: Request approval
     Vault ->> Core: Result:<br/>- Authorization signature<br/>- PRF results
     deactivate Vault
-    Core -->> App: Action:<br/>- Verify signature<br/>- Derive admin private key from PRF<br/>- Decrypt secrets with admin private key<br/>- Encrypt decrypted secrets with the user's public keys<br/><br/>Result:<br/>- Secrets encrypted with the user's public keys
+    Core -->> App: Action:<br/>- Verify signature<br/>- Derive admin private key from PRF<br/>- Decrypt secrets with admin private key<br/>- Encrypt decrypted secrets with the user's public keys<br/>---<br/>Result:<br/>- Secrets encrypted with the user's public keys
     deactivate Core
     App <<->> Cli: [POST]<br/>- /api/secrets<br/>- Encrypted secrets
     Note over User, App: Once synced, the user can access secrets in the added environment
