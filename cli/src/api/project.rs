@@ -1,5 +1,5 @@
-use crate::api::dto::CreateProjectDTO;
-use crate::api::manager::{ACTIVE_MANAGER, get_readonly_manager};
+use crate::api::dto::{CreateProjectDTO, UpdateProjectDTO};
+use crate::api::manager::{ACTIVE_MANAGER, get_readonly_manager, get_readwrite_manager};
 use crate::project::BackendManager;
 use axum::http::StatusCode;
 use axum::routing::get;
@@ -50,6 +50,31 @@ async fn create_project(
     Ok(Json(config))
 }
 
+async fn update_project(Json(data): Json<UpdateProjectDTO>) -> Result<(), (StatusCode, String)> {
+    let mut manager = get_readwrite_manager()?;
+
+    if let Some(config) = data.config {
+        manager.config = config;
+    }
+
+    if let Some(public_keys) = data.public_keys {
+        manager.public_keys = public_keys;
+    }
+
+    if let Err(err) = manager.write() {
+        println!("Error writing secretpass config: {:?}", err);
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Error writing config to disk: {}", err),
+        ));
+    }
+
+    Ok(())
+}
+
 pub fn project_routes() -> Router {
-    Router::new().route("/api/project", get(get_project).post(create_project))
+    Router::new().route(
+        "/api/project",
+        get(get_project).post(create_project).patch(update_project),
+    )
 }

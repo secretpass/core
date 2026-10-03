@@ -1,14 +1,12 @@
 use crate::project::directory::get_working_directory;
-use crate::project::secret::SecretValue;
 use secretpass_core::{
-    SecretManagerConfig, SecretManagerConfigLock, SecretpassUser, StoredPublicKey,
-    StoredPublicKeysLock,
+    SecretDataType, SecretDefinition, SecretManagerConfig, SecretManagerConfigLock,
+    SecretpassEnvironment, SecretpassUser, StoredPublicKey, StoredPublicKeysLock,
 };
 use std::collections::HashMap;
 
 use secretpass_core::utils::bin_encode;
 use std::fs;
-use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct BackendManager {
@@ -70,6 +68,56 @@ impl BackendManager {
         user.cloned()
     }
 
+    pub fn get_environment(&self, env_name: &str) -> Option<SecretpassEnvironment> {
+        self.config
+            .environments
+            .iter()
+            .find(|env| env.name == env_name)
+            .cloned()
+    }
+
+    pub fn get_environment_mut(&mut self, env_name: &str) -> Option<&mut SecretpassEnvironment> {
+        self.config
+            .environments
+            .iter_mut()
+            .find(|env| env.name == env_name)
+    }
+
+    pub fn add_or_update_secret_definition(
+        &mut self,
+        env_name: &str,
+        secret_name: &str,
+        data_type: SecretDataType,
+        description: String,
+    ) -> Option<SecretDefinition> {
+        let environment = self.get_environment_mut(env_name)?;
+
+        let definition = environment
+            .secrets
+            .iter_mut()
+            .find(|def| def.name == secret_name);
+        if let Some(definition) = definition {
+            definition.data_type = data_type;
+            definition.description = description;
+            Some(definition.clone())
+        } else {
+            let secret_definition = SecretDefinition {
+                name: secret_name.to_string(),
+                data_type,
+                description,
+            };
+            environment.secrets.push(secret_definition.clone());
+            Some(secret_definition)
+        }
+    }
+
+    pub fn delete_secret_definition(&mut self, env_name: &str, secret_name: &str) {
+        let environment = self.get_environment_mut(env_name);
+        if let Some(environment) = environment {
+            environment.secrets.retain(|def| def.name != secret_name);
+        }
+    }
+
     pub fn get_user_lock_package(
         &self,
         user: &SecretpassUser,
@@ -112,26 +160,35 @@ impl BackendManager {
         Ok((public_keys, config_lock, public_keys_lock))
     }
 
-    fn add_user(
-        &mut self,
-        user: SecretpassUser,
-        public_key: StoredPublicKey,
-        secrets: Vec<SecretValue>,
-    ) {
-        self.config.users.push(user);
-        self.add_public_key(public_key, secrets);
+    pub fn get_public_keys_for_env(&self, env_name: String) -> Vec<StoredPublicKey> {
+        let mut public_keys: Vec<StoredPublicKey> = Vec::new();
+        for user in self.config.users.iter() {
+            if !user.has_access(env_name.clone()) {
+                continue;
+            }
+            for pk in self.public_keys.iter() {
+                if let Some(passkey) = &pk.passkey
+                    && passkey.user_id == user.id
+                {
+                    public_keys.push(pk.clone());
+                }
+            }
+        }
+
+        // TODO: Add logic for machine keys
+
+        public_keys
     }
 
-    fn add_public_key(&mut self, key: StoredPublicKey, secrets: Vec<SecretValue>) {
-        // Save the secrets
-        self.public_keys.push(key);
+    pub fn read_secrets_value(
+        env_name: &str,
+        secret_name: &str,
+    ) -> anyhow::Result<Option<HashMap<String, String>>> {
+        let dir = get_working_directory();
 
-        // TODO: Add logic for writing secret values
-    }
-
-    fn read_secrets_value(path: &PathBuf) -> anyhow::Result<HashMap<String, String>> {
+        let path = dir.secrets_path(env_name, secret_name);
         if !path.exists() {
-            return Ok(HashMap::new());
+            return Ok(None);
         }
 
         if !path.is_file() {
@@ -144,20 +201,30 @@ impl BackendManager {
         let content = fs::read_to_string(path)?;
         let content: HashMap<String, String> = serde_json::from_str(&content)?;
 
-        Ok(content)
+        Ok(Some(content))
     }
 
-    fn add_key_secrets(key: &StoredPublicKey, secrets: Vec<SecretValue>) -> anyhow::Result<()> {
+    pub fn write_secret_value(
+        env_name: &str,
+        secret_name: &str,
+        value: HashMap<String, String>,
+    ) -> anyhow::Result<()> {
         let dir = get_working_directory();
-        for secret in secrets {
-            let secret_path =
-                dir.secrets_path(secret.environment.clone(), secret.secret_name.clone());
-            let mut content = Self::read_secrets_value(&secret_path)?;
-            content.insert(key.id.clone(), secret.encrypted_value.clone());
-            let json_content = serde_json::to_string_pretty(&content)?;
-            fs::write(secret_path, json_content)?;
-        }
+        let path = dir.secrets_path(env_name, secret_name);
 
+        fs::create_dir_all(path.parent().unwrap())?;
+
+        let content = serde_json::to_string_pretty(&value)?;
+        fs::write(path, content)?;
+
+        Ok(())
+    }
+
+    pub fn delete_secret(env_name: &str, secret_name: &str) -> anyhow::Result<()> {
+        let dir = get_working_directory();
+        let path = dir.secrets_path(env_name, secret_name);
+
+        fs::remove_file(path)?;
         Ok(())
     }
 

@@ -25,7 +25,7 @@ export function LoginDashboard({
   );
 
   return (
-    <div className="grow flex flex-col items-center justify-center">
+    <div className="content flex flex-col items-center justify-center">
       <Card className={"w-full max-w-xl"}>
         {active_view === ActiveView.Dashboard && (
           <Card.Header className="text-center">

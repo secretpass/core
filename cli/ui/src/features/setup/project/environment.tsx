@@ -102,7 +102,9 @@ function EnvironmentEditor({
     if (!NewEnvironmentItemSchema.validate(env)) {
       return false;
     }
-    const duplicates = state.environments.filter((e) => e.name === env.name);
+    const duplicates = state.environments.filter(
+      (e) => e.name.toLowerCase() === env.name.toLowerCase(),
+    );
     return duplicates.length === 1;
   }, [env, state]);
   return (

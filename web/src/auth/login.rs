@@ -14,9 +14,9 @@ use web_sys::{
 
 #[derive(Debug, Deserialize, Tsify)]
 pub struct LoginParams {
-    pub(crate) project: SecretpassProject,
-    pub(crate) user: SecretpassUser,
-    pub(crate) public_keys: Vec<StoredPublicKey>,
+    pub project: SecretpassProject,
+    pub user: SecretpassUser,
+    pub public_keys: Vec<StoredPublicKey>,
 }
 
 pub async fn login_user_bounded(

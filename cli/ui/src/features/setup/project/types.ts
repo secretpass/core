@@ -1,14 +1,9 @@
 import * as z from "zod";
+import { SAFE_NAME_SCHEMA } from "@/constants";
 import type { EncryptionAlgorithm, PasskeyResidency } from "@/core/web";
 
 export const NewEnvironmentItemSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .regex(/^[a-zA-Z_][a-zA-Z0-9_-]*$/, {
-      message:
-        "Must be a valid environment variable name (letters, numbers, underscores, cannot start with a number).",
-    }),
+  name: SAFE_NAME_SCHEMA,
   description: z.string().optional(),
 });
 
@@ -16,7 +11,9 @@ export const NewEnvironmentsSchema = z
   .array(NewEnvironmentItemSchema)
   .min(1)
   .refine(
-    (items) => new Set(items.map((item) => item.name)).size === items.length,
+    (items) =>
+      new Set(items.map((item) => item.name.toLowerCase())).size ===
+      items.length,
   );
 
 export type NewEnvironment = z.infer<typeof NewEnvironmentItemSchema>;

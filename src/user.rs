@@ -20,4 +20,8 @@ impl SecretpassUser {
             self.id, self.username, self.level, self.created_at
         )
     }
+
+    pub fn has_access(&self, env_name: String) -> bool {
+        self.level == UserLevel::Admin || self.access.contains(&env_name)
+    }
 }

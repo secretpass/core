@@ -1,8 +1,9 @@
 use secretpass_core::{
-    SecretpassEnvironment, SecretpassProject, SecretpassUser,
+    SecretDataType, SecretManagerConfig, SecretpassEnvironment, SecretpassProject, SecretpassUser,
     StoredPublicKey,
 };
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateProjectDTO {
@@ -15,4 +16,19 @@ pub struct CreateProjectDTO {
 #[derive(Debug, Deserialize)]
 pub struct UserLockPackageRequestDTO {
     pub username: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateProjectDTO {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub config: Option<SecretManagerConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub public_keys: Option<Vec<StoredPublicKey>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateOrUpdateSecretDTO {
+    pub description: String,
+    pub data_type: SecretDataType,
+    pub value: HashMap<String, String>,
 }

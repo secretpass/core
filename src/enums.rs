@@ -45,3 +45,12 @@ pub enum UserLevel {
     Standard,
     Viewer,
 }
+
+#[wasm_bindgen(skip_typescript)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, EnumString, Display, Tsify)]
+#[tsify(namespace)]
+pub enum SecretDataType {
+    Text,
+    Json,
+    Url,
+}

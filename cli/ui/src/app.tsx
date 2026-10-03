@@ -1,3 +1,4 @@
+import { Toast } from "@heroui/react";
 import { useEffect, useMemo, useState } from "react";
 import initCore, { type SecretpassProject } from "@/core/web";
 import { Navbar } from "@/features/navigation";
@@ -52,7 +53,8 @@ export function App() {
   );
 
   return (
-    <main className="flex flex-col min-h-screen min-w-screen">
+    <main className="min-h-screen min-w-screen">
+      <Toast.Provider />
       <Navbar />
 
       {state.loading && (

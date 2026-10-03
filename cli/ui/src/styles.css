@@ -160,3 +160,19 @@
   --warning-foreground: oklch(15% 0.0404 86.06);
   --accent-soft-foreground: oklch(0.9848 0 0);
 }
+
+.content {
+  height: calc(100vh - 4em);
+}
+
+.dashboard-active {
+  height: calc(100% - 4em);
+}
+
+.dashboard-inactive {
+  height: 4em;
+}
+
+.dashboard-content-height {
+  height: calc(100% - 4em);
+}

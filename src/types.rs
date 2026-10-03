@@ -1,14 +1,17 @@
+use crate::enums::SecretDataType;
 use crate::{
     SecretManagerConfigLock, SecretpassProject, SecretpassUser, StoredPublicKey,
     StoredPublicKeysLock,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tsify::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
 pub struct SecretDefinition {
     pub name: String,
+    pub data_type: SecretDataType,
     pub description: String,
 }
 
@@ -59,4 +62,10 @@ pub struct UserLockPackage {
     pub public_keys: Vec<StoredPublicKey>,
     pub config_lock: SecretManagerConfigLock,
     pub public_keys_lock: StoredPublicKeysLock,
+}
+
+#[derive(Debug, Clone, Serialize, Tsify)]
+pub struct EnvironmentLockPackage {
+    pub public_keys: Vec<StoredPublicKey>,
+    pub encrypted_secrets: HashMap<String, Option<String>>,
 }

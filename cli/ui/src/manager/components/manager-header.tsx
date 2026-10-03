@@ -1,18 +1,22 @@
 import { Chip, Tabs } from "@heroui/react";
 import {
   IconFlask,
-  IconHome,
   IconShield,
   IconUser,
   IconUsers,
 } from "@tabler/icons-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useSecretManager } from "../provider";
 
-type ActiveVIew = "overview" | "secrets" | "users";
+export type ActiveVIew = "secrets" | "administration";
 
-export function SecretManagerTabs() {
-  const [active_view, setActiveView] = useState<ActiveVIew>("overview");
+export function SecretManagerTabs({
+  active_view,
+  setActiveView,
+}: {
+  active_view: ActiveVIew;
+  setActiveView: (view: ActiveVIew) => void;
+}) {
   return (
     <Tabs
       variant="secondary"
@@ -21,13 +25,6 @@ export function SecretManagerTabs() {
     >
       <Tabs.ListContainer>
         <Tabs.List aria-label="Secret Manager">
-          <Tabs.Tab id="overview" className="w-auto">
-            <span className="flex gap-1 items-center">
-              <IconHome className="size-4" />
-              Overview
-            </span>
-            <Tabs.Indicator />
-          </Tabs.Tab>
           <Tabs.Tab id="secrets">
             <span className="flex gap-1 items-center">
               <IconShield className="size-4" />
@@ -35,10 +32,10 @@ export function SecretManagerTabs() {
             </span>
             <Tabs.Indicator />
           </Tabs.Tab>
-          <Tabs.Tab id="users">
+          <Tabs.Tab id="administration">
             <span className="flex gap-1 items-center">
               <IconUsers className="size-4" />
-              Users
+              Administration
             </span>
             <Tabs.Indicator />
           </Tabs.Tab>

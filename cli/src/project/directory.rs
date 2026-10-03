@@ -78,7 +78,7 @@ impl WorkingDirectory {
         fs::read_to_string(self.public_keys_lock_path())
     }
 
-    pub fn secrets_path(&self, env: String, secret_name: String) -> PathBuf {
+    pub fn secrets_path(&self, env: &str, secret_name: &str) -> PathBuf {
         self.project_dir()
             .join(format!("secrets/{}/{}.json", env, secret_name))
     }
