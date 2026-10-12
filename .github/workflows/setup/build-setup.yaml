@@ -1,5 +1,5 @@
 - name: Export Rust Flags
-  run: echo "RUSTFLAGS='--cfg web_sys_unstable_apis'" >> $GITHUB_ENV
+  run: echo "RUSTFLAGS=--cfg web_sys_unstable_apis" >> $GITHUB_ENV
 
 - name: Setup Bun
   uses: oven-sh/setup-bun@v2
