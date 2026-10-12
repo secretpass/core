@@ -27,10 +27,6 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 
-[lib]
-# This library is used in cli and also as part of the cloud for on device encryption and decryption
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 aes-gcm = { version = "0.11.1", features = ["getrandom"] }
 anyhow = "1.0.104"
