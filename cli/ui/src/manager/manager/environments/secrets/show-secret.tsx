@@ -22,27 +22,17 @@ import {
   type LoginParams,
   type SecretDefinition,
   type SecretpassEnvironment,
-  type StoredPublicKey,
 } from "@/core/web";
 import { useSecretManager } from "@/manager/provider";
-import { makeRequest } from "@/utils";
+import { resolveRequest } from "@/utils";
 import { useCreateOrUpdateSecret } from "./shared";
 
 interface ViewSecretProps {
-  onComplete: () => void;
   environment: SecretpassEnvironment;
-  public_keys: StoredPublicKey[];
   secret: SecretDefinition;
-  encrypted_value: string | null;
 }
 
-export function ViewSecret({
-  onComplete,
-  environment,
-  public_keys,
-  secret,
-  encrypted_value,
-}: ViewSecretProps) {
+export function ViewSecret({ environment, secret }: ViewSecretProps) {
   const manager = useSecretManager();
   const [is_locked, setIsLocked] = useState(true);
 
@@ -60,19 +50,16 @@ export function ViewSecret({
     setDecryptedValue("");
   }, []);
 
-  const onCompleteInternal = useCallback(() => {
+  const onComplete = useCallback(() => {
     setDecryptedValue(value);
-    onComplete();
     toast(`${secret.name} updated successfully`, { variant: "success" });
-  }, [value, onComplete, secret.name]);
+  }, [value, secret.name]);
 
-  const updateSecret = useCreateOrUpdateSecret(
-    environment,
-    public_keys,
-    onCompleteInternal,
-  );
+  const updateSecret = useCreateOrUpdateSecret(environment);
 
   const unlock = useCallback(() => {
+    const encrypted_value =
+      manager.lock_package[environment.name]?.encrypted_secrets?.[secret.name];
     if (!encrypted_value) {
       setIsLocked(false);
       setSecretValue("");
@@ -96,7 +83,7 @@ export function ViewSecret({
         setIsLocked(false);
       })
       .catch((err) => toast(String(err), { variant: "danger" }));
-  }, [manager, encrypted_value]);
+  }, [manager, manager.lock_package, environment.name, secret.name]);
 
   const deleteSecret = useCallback(() => {
     const params: LoginParams = {
@@ -106,30 +93,17 @@ export function ViewSecret({
     };
     authorize_operation(JSON.stringify(params))
       .then(() =>
-        makeRequest(`/api/secrets/${environment.name}/${secret.name}`, {
+        resolveRequest(`/api/secrets/${environment.name}/${secret.name}`, {
           method: "DELETE",
         }),
       )
-      .then((response) => {
-        if (response.ok) {
-          toast(`${secret.name} deleted`, { variant: "success" });
-          manager.complexUpdate((state) => {
-            const env = state.config.environments.find(
-              (e) => e.name === environment.name,
-            );
-            if (!env) {
-              return;
-            }
-            env.secrets = env.secrets?.filter(
-              (sec) => sec.name !== secret.name,
-            );
-          });
-          onComplete();
-        } else {
-          toast(``);
-        }
-      })
-      .catch((err) => toast(String(err), { variant: "danger" }));
+      .then(() => manager.refreshState(`${secret.name} deleted`))
+      .then(onComplete)
+      .catch((err) =>
+        toast(`Error deleting secret: ${err}`, {
+          variant: "danger",
+        }),
+      );
   }, [manager, environment.name, secret.name, onComplete]);
 
   return (
@@ -171,8 +145,8 @@ export function ViewSecret({
             )}
             onClick={is_locked ? unlock : reset}
           >
-            {is_locked && <IconLock className="size-6" />}
-            {!is_locked && <IconLockOpen className="size-6" />}
+            {is_locked && <IconLock className="size-5" />}
+            {!is_locked && <IconLockOpen className="size-5" />}
           </Button>
         </div>
       </div>
@@ -190,6 +164,7 @@ export function ViewSecret({
           {value !== decrypted_value && (
             <div className="flex justify-end mb-4">
               <Button
+                type="button"
                 isDisabled={!is_valid}
                 onClick={() =>
                   updateSecret(secret.name, secret.description, value)

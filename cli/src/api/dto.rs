@@ -32,3 +32,10 @@ pub struct CreateOrUpdateSecretDTO {
     pub data_type: SecretDataType,
     pub value: HashMap<String, String>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct CreateOrUpdateUserDTO {
+    pub user: Option<SecretpassUser>, // None for machine keys
+    pub public_key: StoredPublicKey,
+    pub secret_values: HashMap<String, HashMap<String, String>>,
+}

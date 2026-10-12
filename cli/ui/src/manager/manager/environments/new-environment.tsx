@@ -5,16 +5,16 @@ import {
   Label,
   TextArea,
   TextField,
-  toast,
 } from "@heroui/react";
 import { IconFingerprint, IconX } from "@tabler/icons-react";
 import clsx from "clsx";
 import { useCallback, useMemo, useState } from "react";
+import { ErrorDisplay, useError } from "@/components";
 import { SAFE_NAME_SCHEMA } from "@/constants";
 import { authorize_operation, type LoginParams } from "@/core/web";
 import { useSecretManager } from "@/manager/provider";
 import type { SecretManagerConfig } from "@/types";
-import { makeRequest } from "@/utils";
+import { resolveRequest } from "@/utils";
 
 export function CreateEnvironment({
   setActiveEnvironment,
@@ -29,6 +29,7 @@ export function CreateEnvironment({
     () => manager.config.environments.map((env) => env.name.toLowerCase()),
     [manager.config.environments],
   );
+  const error = useError();
 
   const is_valid = useMemo(
     () =>
@@ -42,7 +43,7 @@ export function CreateEnvironment({
     setName("");
     setDescription("");
   }, []);
-  const createEnvironment = useCallback(() => {
+  const createEnvironment = useCallback(async () => {
     const config: SecretManagerConfig = JSON.parse(
       JSON.stringify(manager.config),
     );
@@ -57,38 +58,32 @@ export function CreateEnvironment({
       project: config.project,
       public_keys: [manager.public_key],
     };
-    authorize_operation(JSON.stringify(params)).then(() =>
-      makeRequest("/api/project", {
+    const auth_result = await error.catch("Authorizing error", () =>
+      authorize_operation(JSON.stringify(params)),
+    );
+    if (!auth_result.ok) {
+      return;
+    }
+
+    const update_result = await error.catch("Error updating config", () =>
+      resolveRequest("/api/project", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ config }),
-      })
-        .then((response) => {
-          if (response.ok) {
-            toast(`Environment ${name} created successfully`, {
-              variant: "success",
-            });
-            manager.update({ config });
-            setActiveEnvironment(name);
-            reset();
-          } else {
-            toast(response.text, { variant: "danger" });
-          }
-        })
-        .catch((err) => toast(String(err), { variant: "danger" })),
+      }),
     );
-  }, [
-    manager.config,
-    manager.user,
-    manager.public_key,
-    description,
-    name,
-    manager.update,
-    reset,
-    setActiveEnvironment,
-  ]);
+
+    if (!update_result.ok) {
+      return;
+    }
+
+    await manager.refreshState(`Environment ${name} created successfully`);
+
+    setActiveEnvironment(name);
+    reset();
+  }, [manager, description, name, reset, setActiveEnvironment, error.catch]);
 
   return (
     <div
@@ -127,6 +122,8 @@ export function CreateEnvironment({
           </Button>
         </>
       )}
+
+      <ErrorDisplay value={error.value} />
 
       {!active && (
         <Button fullWidth variant="tertiary" onClick={() => setActive(true)}>

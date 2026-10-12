@@ -6,6 +6,7 @@ import {
   SecretManagerChips,
   SecretManagerTabs,
 } from "../components/manager-header";
+import { AdministrationTabDashboard } from "./admin/dashboard";
 import { SecretsTabDashboard } from "./environments/dashboard";
 
 export interface SecretManagerDashboardProps {
@@ -34,6 +35,9 @@ export function SecretManagerDashboard({
     >
       <Activity mode={active_view === "secrets" ? "visible" : "hidden"}>
         <SecretsTabDashboard />
+      </Activity>
+      <Activity mode={active_view === "administration" ? "visible" : "hidden"}>
+        <AdministrationTabDashboard />
       </Activity>
     </DashboardLayout>
   );

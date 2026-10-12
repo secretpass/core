@@ -1,0 +1,59 @@
+{
+  "mode": "Local",
+  "project": {
+    "id": "16e2919b-d1c0-4963-a4f6-4ab5fae0ebca",
+    "name": "Secretpass Core",
+    "description": "The core project holding the encryption and decryption logic that powers on device secret encryption and decryption.",
+    "residency": "SyncedAllowed",
+    "algorithm": "Hybrid",
+    "created_at": "2026-10-10T17:13:55.069Z"
+  },
+  "environments": [
+    {
+      "name": "development",
+      "description": "For testing by developers before moving to QC"
+    },
+    {
+      "name": "staging",
+      "description": "For testing by QAs before promoting to production"
+    },
+    {
+      "name": "production",
+      "description": "Prod secrets, heavily restricted"
+    },
+    {
+      "name": "local",
+      "description": "Variables for developing, building cli for local secret management.",
+      "secrets": [
+        {
+          "name": "WEBAUTH_RP_ID",
+          "data_type": "Text",
+          "description": "The domain used by secretpass locally"
+        },
+        {
+          "name": "WEBAUTH_RP_ORIGIN",
+          "data_type": "Text",
+          "description": "The origin used by secretpass locally, since we use a localhost based domain, we use http here."
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "b9ec6c22-dc7a-478f-b8e8-91526365abcd",
+      "username": "billcountry@secretpass.cloud",
+      "name": "Billcountry Mwaniki",
+      "level": "Admin",
+      "created_at": "2026-10-10T17:13:55.069Z"
+    },
+    {
+      "id": "cb54a7e9dba77554289c47eff0d4cc236f690b766c2341aa1fd14a7113b26a57",
+      "name": "TEST_KEY",
+      "level": "Machine",
+      "access": [
+        "local"
+      ],
+      "created_at": "2026-10-10T21:28:09.285Z"
+    }
+  ]
+}

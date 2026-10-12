@@ -1,4 +1,4 @@
-import { Button, IconChevronDown, Link } from "@heroui/react";
+import { Button, Dropdown, IconChevronDown, Link } from "@heroui/react";
 import {
   IconBook2,
   IconBrandDiscord,
@@ -13,11 +13,17 @@ import {
   IconX,
   type TablerIcon,
 } from "@tabler/icons-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Logo } from "@/components";
 import { ThemeToggle } from "@/features/theme/theme-toggle";
 
-const community_links: { label: string; Icon: TablerIcon; href: string }[] = [
+interface LinkItemProps {
+  label: string;
+  Icon: TablerIcon;
+  href: string;
+}
+
+const community_links: LinkItemProps[] = [
   {
     label: "Slack",
     Icon: IconBrandSlack,
@@ -40,7 +46,7 @@ const community_links: { label: string; Icon: TablerIcon; href: string }[] = [
   },
 ];
 
-const resources_links: { label: string; Icon: TablerIcon; href: string }[] = [
+const resources_links: LinkItemProps[] = [
   {
     label: "Docs",
     Icon: IconBook2,
@@ -69,23 +75,10 @@ export function Navbar() {
             <IconDeviceLaptop className="size-7 text-muted" />
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6">
-            <Link
-              href="/docs"
-              target="_blank"
-              className="text-sm flex items-center gap-2 font-medium hover:text-primary no-underline"
-            >
-              Community
-              <IconChevronDown />
-            </Link>
-            <Link
-              href="/docs"
-              target="_blank"
-              className="text-sm flex items-center gap-2 font-medium hover:text-primary no-underline"
-            >
-              Docs
-              <IconExternalLink className="size-4" />
-            </Link>
+          <nav className="hidden md:flex items-center gap-3">
+            <LinkDropDown items={community_links} label="Community" />
+            <LinkDropDown items={resources_links} label="Resources" />
+
             <div className="flex items-center gap-4 border-l pl-4">
               <ThemeToggle />
               <Link
@@ -135,5 +128,40 @@ export function Navbar() {
         )}
       </header>
     </nav>
+  );
+}
+
+function LinkDropDown({
+  items,
+  label,
+}: {
+  items: LinkItemProps[];
+  label: ReactNode;
+}) {
+  return (
+    <Dropdown>
+      <Dropdown.Trigger>
+        <Button variant="ghost">
+          {label}
+          <IconChevronDown />
+        </Button>
+      </Dropdown.Trigger>
+      <Dropdown.Popover>
+        <Dropdown.Menu>
+          {items.map((item) => (
+            <Dropdown.Item
+              className="flex items-center gap-2"
+              key={item.href}
+              href={item.href}
+              target="_blank"
+            >
+              <item.Icon className="size-5" />
+              <span className="grow">{item.label}</span>
+              <IconExternalLink className="size-4" />
+            </Dropdown.Item>
+          ))}
+        </Dropdown.Menu>
+      </Dropdown.Popover>
+    </Dropdown>
   );
 }

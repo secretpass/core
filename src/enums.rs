@@ -43,7 +43,7 @@ pub enum PublicKeyType {
 pub enum UserLevel {
     Admin,
     Standard,
-    Viewer,
+    Machine,
 }
 
 #[wasm_bindgen(skip_typescript)]
@@ -53,4 +53,29 @@ pub enum SecretDataType {
     Text,
     Json,
     Url,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, EnumString, Display, Tsify)]
+#[tsify(namespace)]
+pub enum LogSource {
+    StdOut,
+    StdError,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, EnumString, Display, Tsify)]
+#[tsify(namespace)]
+pub enum CommandStatus {
+    Pending,
+    Running {
+        environment: String,
+        process_id: u32,
+    },
+    Stopped {
+        environment: String,
+        exit_code: Option<i32>,
+    },
+    Error {
+        environment: String,
+        message: String,
+    },
 }

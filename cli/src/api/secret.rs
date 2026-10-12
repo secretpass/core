@@ -1,6 +1,6 @@
 use crate::api::dto::CreateOrUpdateSecretDTO;
-use crate::api::manager::get_readwrite_manager;
-use crate::project::BackendManager;
+use crate::manager::get_readwrite_manager;
+use crate::project::{delete_secret, write_secret_value};
 use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::routing::put;
@@ -21,14 +21,12 @@ async fn create_or_update_secret(
     })?;
 
     // Write the secret value
-    BackendManager::write_secret_value(&env_name, &secret_name, data.value.clone()).map_err(
-        |err| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Error writing secret value: {}", err),
-            )
-        },
-    )?;
+    write_secret_value(&env_name, &secret_name, data.value.clone()).map_err(|err| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Error writing secret value: {}", err),
+        )
+    })?;
 
     // Update the config
     manager
@@ -55,12 +53,12 @@ async fn create_or_update_secret(
     Ok(())
 }
 
-async fn delete_secret(
+async fn delete_secret_route(
     Path((env_name, secret_name)): Path<(String, String)>,
 ) -> Result<(), (StatusCode, String)> {
     let mut manager = get_readwrite_manager()?;
 
-    BackendManager::delete_secret(&env_name, &secret_name).map_err(|err| {
+    delete_secret(&env_name, &secret_name).map_err(|err| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Error deleting secret: {}", err),
@@ -82,6 +80,6 @@ async fn delete_secret(
 pub fn secrets_routes() -> Router {
     Router::new().route(
         "/api/secrets/{env_name}/{secret_name}",
-        put(create_or_update_secret).delete(delete_secret),
+        put(create_or_update_secret).delete(delete_secret_route),
     )
 }

@@ -2,7 +2,6 @@ import { Alert, Button, Description } from "@heroui/react";
 import { IconFingerprint, IconFolder } from "@tabler/icons-react";
 import { useCallback, useState } from "react";
 import { LoadingCircle } from "@/components/loader";
-import { CWD_HEADER } from "@/constants";
 import {
   type RegistrationParams,
   register_user,
@@ -11,14 +10,13 @@ import {
   type StoredPublicKey,
 } from "@/core/web";
 import type { RegistrationState } from "@/features/setup/project/types.ts";
-import type { SecretMangerState } from "@/manager";
 import type { SecretManagerConfig } from "@/types";
 import { type ComplexState, makeRequest } from "@/utils.ts";
 
 interface CompletionScreenProps {
   state: ComplexState<RegistrationState>;
   directory: string;
-  onAuthComplete: (state: SecretMangerState) => void;
+  onAuthComplete: (public_key_id: string) => void;
 }
 
 export function CompletionScreen({
@@ -48,13 +46,12 @@ export function CompletionScreen({
       level: "Admin",
       created_at: state.created,
     };
-    const params: RegistrationParams = {
-      name: state.key_name,
+    const params = JSON.stringify({
       project,
       user,
-    };
+    } as RegistrationParams);
 
-    register_user(JSON.stringify(params))
+    register_user(state.key_name, params)
       .then(async (public_key_json) => {
         setLoading(true);
         const public_key: StoredPublicKey = JSON.parse(public_key_json);
@@ -76,15 +73,7 @@ export function CompletionScreen({
         );
 
         if (response.ok) {
-          const config = response.json();
-          const directory = response.headers.get(CWD_HEADER) as string;
-          onAuthComplete({
-            config,
-            directory,
-            public_key,
-            public_keys: [public_key],
-            user,
-          });
+          onAuthComplete(public_key.id);
         } else {
           setError(`Failed to create project: ${response.text}`);
         }

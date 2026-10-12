@@ -1,15 +1,18 @@
-use crate::project::directory::get_working_directory;
+use crate::project::directory::{WorkingDirectory, get_working_directory};
 use secretpass_core::{
-    SecretDataType, SecretDefinition, SecretManagerConfig, SecretManagerConfigLock,
-    SecretpassEnvironment, SecretpassUser, StoredPublicKey, StoredPublicKeysLock,
+    EnvironmentLockPackage, MultiEnvironmentLockPackage, PublicKeyType, SecretDataType,
+    SecretDefinition, SecretManagerConfig, SecretManagerConfigLock, SecretpassEnvironment,
+    SecretpassUser, StoredPublicKey, StoredPublicKeysLock, UserApplicationState, UserLevel,
 };
 use std::collections::HashMap;
 
-use secretpass_core::utils::bin_encode;
+use crate::project::environment::get_environment_encrypted_secrets;
+use axum::http::StatusCode;
 use std::fs;
 
 #[derive(Debug, Clone)]
 pub struct BackendManager {
+    pub dir: WorkingDirectory,
     pub config: SecretManagerConfig,
     pub config_lock: SecretManagerConfigLock,
     pub public_keys: Vec<StoredPublicKey>,
@@ -56,6 +59,7 @@ impl BackendManager {
                 })?;
 
         Ok(Some(Self {
+            dir,
             config,
             config_lock,
             public_keys,
@@ -63,9 +67,27 @@ impl BackendManager {
         }))
     }
 
-    pub fn get_user_by_username(&self, username: &str) -> Option<SecretpassUser> {
-        let user = self.config.users.iter().find(|u| u.username == username);
+    pub fn get_user_by_id(&self, user_id: &str) -> Option<SecretpassUser> {
+        let user = self.config.users.iter().find(|u| u.id == user_id);
         user.cloned()
+    }
+
+    pub fn get_user_by_username(&self, username: &str) -> Option<SecretpassUser> {
+        for user in self.config.users.iter() {
+            if let Some(current_username) = &user.username
+                && current_username == username
+            {
+                return Some(user.clone());
+            }
+        }
+        None
+    }
+
+    pub fn get_public_key(&self, key_id: &str) -> Option<StoredPublicKey> {
+        self.public_keys
+            .iter()
+            .find(|key| key.id == key_id)
+            .cloned()
     }
 
     pub fn get_environment(&self, env_name: &str) -> Option<SecretpassEnvironment> {
@@ -81,6 +103,62 @@ impl BackendManager {
             .environments
             .iter_mut()
             .find(|env| env.name == env_name)
+    }
+
+    pub fn get_user_application_state(
+        &self,
+        key_id: &str,
+    ) -> Result<UserApplicationState, (StatusCode, String)> {
+        let public_key = self
+            .get_public_key(key_id)
+            .ok_or_else(|| (StatusCode::NOT_FOUND, "Public key not found".to_string()))?;
+        let passkey = public_key
+            .passkey
+            .as_ref()
+            .ok_or_else(|| (StatusCode::NOT_FOUND, "Passkey not found".to_string()))?;
+        let user = self
+            .get_user_by_id(&passkey.user_id)
+            .ok_or_else(|| (StatusCode::NOT_FOUND, "User not found".to_string()))?;
+
+        let environments = match user.level {
+            UserLevel::Admin => self
+                .config
+                .environments
+                .iter()
+                .map(|env| env.name.clone())
+                .collect(),
+            _ => user.access.clone(),
+        };
+
+        let mut lock_package = MultiEnvironmentLockPackage::new();
+        for env_name in environments {
+            let environment = self.get_environment(&env_name).ok_or_else(|| {
+                (
+                    StatusCode::NOT_FOUND,
+                    format!("Environment {env_name} not found"),
+                )
+            })?;
+
+            let public_keys = self.get_public_keys_for_env(env_name.clone());
+            let encrypted_secrets = get_environment_encrypted_secrets(&environment, &public_key)?;
+
+            lock_package.insert(
+                env_name.clone(),
+                EnvironmentLockPackage {
+                    public_keys,
+                    encrypted_secrets,
+                },
+            );
+        }
+
+        Ok(UserApplicationState {
+            directory: self.dir.short_path(),
+            config: self.config.clone(),
+            user,
+            public_key,
+            public_keys: self.public_keys.clone(),
+            lock_package,
+        })
     }
 
     pub fn add_or_update_secret_definition(
@@ -118,46 +196,28 @@ impl BackendManager {
         }
     }
 
-    pub fn get_user_lock_package(
-        &self,
-        user: &SecretpassUser,
-    ) -> anyhow::Result<(
-        Vec<StoredPublicKey>,
-        SecretManagerConfigLock,
-        StoredPublicKeysLock,
-    )> {
+    pub fn get_user_public_keys(&self, user: &SecretpassUser) -> Option<Vec<StoredPublicKey>> {
         let mut public_keys: Vec<StoredPublicKey> = vec![];
-        let mut config_lock: SecretManagerConfigLock = Default::default();
-        let mut public_keys_lock: StoredPublicKeysLock = Default::default();
 
         for pk in self.public_keys.iter() {
-            if let Some(passkey) = &pk.passkey
-                && passkey.username == user.username
-                && passkey.user_id == user.id
-            {
+            let is_a_match = if let Some(passkey) = &pk.passkey {
+                passkey.user_id == user.id
+            } else {
+                pk.type_ == PublicKeyType::Machine
+                    && user.level == UserLevel::Machine
+                    && pk.id == user.id
+            };
+
+            if is_a_match {
                 public_keys.push(pk.clone());
-                config_lock.insert(
-                    pk.id.clone(),
-                    self.config_lock
-                        .get(&pk.id)
-                        .ok_or_else(|| {
-                            anyhow::format_err!("Config lock not found for key ID: {}", pk.id)
-                        })?
-                        .clone(),
-                );
-                public_keys_lock.insert(
-                    pk.id.clone(),
-                    self.public_keys_lock
-                        .get(&pk.id)
-                        .ok_or_else(|| {
-                            anyhow::format_err!("Public key lock not found for key ID: {}", pk.id)
-                        })?
-                        .clone(),
-                );
             }
         }
 
-        Ok((public_keys, config_lock, public_keys_lock))
+        if public_keys.is_empty() {
+            return None;
+        }
+
+        Some(public_keys)
     }
 
     pub fn get_public_keys_for_env(&self, env_name: String) -> Vec<StoredPublicKey> {
@@ -167,6 +227,11 @@ impl BackendManager {
                 continue;
             }
             for pk in self.public_keys.iter() {
+                if pk.type_ == PublicKeyType::Machine && pk.id == user.id {
+                    public_keys.push(pk.clone());
+                    continue;
+                }
+
                 if let Some(passkey) = &pk.passkey
                     && passkey.user_id == user.id
                 {
@@ -175,65 +240,15 @@ impl BackendManager {
             }
         }
 
-        // TODO: Add logic for machine keys
-
         public_keys
-    }
-
-    pub fn read_secrets_value(
-        env_name: &str,
-        secret_name: &str,
-    ) -> anyhow::Result<Option<HashMap<String, String>>> {
-        let dir = get_working_directory();
-
-        let path = dir.secrets_path(env_name, secret_name);
-        if !path.exists() {
-            return Ok(None);
-        }
-
-        if !path.is_file() {
-            return Err(anyhow::format_err!(
-                "Path({}) is not a file",
-                path.display()
-            ));
-        }
-
-        let content = fs::read_to_string(path)?;
-        let content: HashMap<String, String> = serde_json::from_str(&content)?;
-
-        Ok(Some(content))
-    }
-
-    pub fn write_secret_value(
-        env_name: &str,
-        secret_name: &str,
-        value: HashMap<String, String>,
-    ) -> anyhow::Result<()> {
-        let dir = get_working_directory();
-        let path = dir.secrets_path(env_name, secret_name);
-
-        fs::create_dir_all(path.parent().unwrap())?;
-
-        let content = serde_json::to_string_pretty(&value)?;
-        fs::write(path, content)?;
-
-        Ok(())
-    }
-
-    pub fn delete_secret(env_name: &str, secret_name: &str) -> anyhow::Result<()> {
-        let dir = get_working_directory();
-        let path = dir.secrets_path(env_name, secret_name);
-
-        fs::remove_file(path)?;
-        Ok(())
     }
 
     fn compile_lock_file(&self, content: String) -> anyhow::Result<HashMap<String, String>> {
         let mut lock_values: HashMap<String, String> = HashMap::new();
 
         for public_key in &self.public_keys {
-            let encrypted_keys = public_key.encrypt(content.clone().into_bytes())?;
-            lock_values.insert(public_key.id.clone(), bin_encode(&encrypted_keys));
+            let encrypted_key = public_key.encrypt(content.clone().into_bytes())?;
+            lock_values.insert(public_key.id.clone(), encrypted_key);
         }
 
         Ok(lock_values)

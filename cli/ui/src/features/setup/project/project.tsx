@@ -3,7 +3,6 @@ import { Activity } from "react";
 import { StepperView } from "@/components/stepper";
 import { CompletionScreen } from "@/features/setup/project/completion.tsx";
 import type { RegistrationState } from "@/features/setup/project/types.ts";
-import type { SecretMangerState } from "@/manager";
 import { useComplexState } from "@/utils.ts";
 import { EncryptionAlgorithmSelector } from "./algorithms";
 import { EnvironmentDefinitions } from "./environment";
@@ -16,12 +15,12 @@ export function CreateProject({
   onAuthComplete,
   directory,
 }: {
-  onAuthComplete: (state: SecretMangerState) => void;
+  onAuthComplete: (public_key_id: string) => void;
   directory: string;
 }) {
   const stepper = useProjectStepper();
 
-  const state = useComplexState<RegistrationState>({
+  const state = useComplexState<RegistrationState>(() => ({
     id: crypto.randomUUID(),
     project_name: "",
     description: "",
@@ -46,7 +45,7 @@ export function CreateProject({
     user_display_name: "",
     user_email_address: "",
     key_name: "Passkey 0",
-  });
+  }));
 
   return (
     <div className="relative flex w-full min-w-xl gap-6">

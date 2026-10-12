@@ -25,8 +25,15 @@ impl StoredPublicKey {
         PublicKey::from_encoded(self.ecc.clone(), self.kem.clone())
     }
 
-    pub fn encrypt(&self, payload: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+    pub fn encrypt(&self, payload: Vec<u8>) -> anyhow::Result<String> {
         self.public_key()?.encrypt(payload)
+    }
+
+    pub fn encrypt_package(
+        &self,
+        decrypted_package: HashMap<String, Vec<u8>>,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        self.public_key()?.encrypt_package(decrypted_package)
     }
 }
 

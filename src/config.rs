@@ -2,14 +2,14 @@ use crate::user::SecretpassUser;
 use crate::{OperationMode, SecretpassEnvironment, SecretpassProject};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tsify::Tsify;
+use wasm_bindgen::prelude::wasm_bindgen;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
 pub struct SecretManagerConfig {
     pub mode: OperationMode,
     pub project: SecretpassProject,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub environments: Vec<SecretpassEnvironment>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub users: Vec<SecretpassUser>,
 }
 

@@ -6,3 +6,8 @@ rustdocflags = ["--cfg=web_sys_unstable_apis"]
 WEBAUTH_RP_ID = ""
 WEBAUTH_RP_ENTITY = ""
 WEBAUTH_RP_ORIGIN = ""
+# Open secrets, they remain the same across builds
+POSTHOG_DEFAULTS = "2026-05-30"
+POSTHOG_UI_HOST = "https://eu.i.posthog.com"
+POSTHOG_API_HOST = "https://b.secretpass.cloud"
+POSTHOG_PROJECT_TOKEN = "phc_yyfZKMnF44Gu7oHNc5H8E6KDL6fNHD5cGmE2GbBUnLca"

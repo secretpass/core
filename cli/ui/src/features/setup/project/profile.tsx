@@ -70,6 +70,10 @@ export function AdminProfile({
           value={state.key_name}
           onChange={(e) => state.update({ key_name: e.target.value })}
         />
+        <Description>
+          Provide a descriptive name that can help you easily identify this
+          passkey
+        </Description>
       </TextField>
 
       <ControlButtons

@@ -1,6 +1,7 @@
+use crate::PublicKeyType;
 use crate::keys::derive::{EccPublicKey, KemPublicKey};
 use crate::types::EncryptedPackage;
-use crate::utils::{bin_decode, bin_encode, get_global_rng};
+use crate::utils::{bin_decode, bin_encode, bin_serialize, get_global_rng, sha256_digest};
 use aes_gcm::{
     Aes256Gcm, Nonce,
     aead::{Aead, KeyInit},
@@ -8,6 +9,7 @@ use aes_gcm::{
 use fips203::traits::{Encaps, SerDes};
 use rand::TryRng;
 use serde::Serialize;
+use std::collections::HashMap;
 use x25519_dalek::StaticSecret;
 
 #[derive(Clone, Serialize)]
@@ -27,7 +29,6 @@ impl PublicKey {
         let kem = match kem {
             Some(value) => {
                 let bytes = bin_decode(&value)?;
-                println!(">>>>>> Trying to convert {} bytes to 1184", bytes.len());
                 let key_bytes: [u8; 1184] = bytes.as_slice().try_into()?;
                 let key = KemPublicKey::try_from_bytes(key_bytes).unwrap();
                 Some(key)
@@ -62,7 +63,7 @@ impl PublicKey {
             .map(|value| bin_encode(&value.clone().into_bytes()))
     }
 
-    pub fn encrypt(&self, payload: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+    pub fn encrypt(&self, payload: Vec<u8>) -> anyhow::Result<String> {
         let nonce_bytes = generate_nonce_bytes()?;
 
         let (ecc_public_key, ecc_shared_secret) = self.get_ecc_aes_keys();
@@ -74,16 +75,22 @@ impl PublicKey {
             payload = Self::aes_encrypt_payload(nonce_bytes, shared_secret, &payload)?
         }
 
-        let encrypted_package = EncryptedPackage {
-            ecc_public_key,
-            kem_ciphertext,
-            nonce: nonce_bytes,
-            payload,
-        };
+        let encrypted_package =
+            EncryptedPackage(ecc_public_key, kem_ciphertext, nonce_bytes, payload);
 
-        let encrypted_payload = rmp_serde::to_vec(&encrypted_package)?;
+        bin_serialize(&encrypted_package)
+    }
 
-        Ok(encrypted_payload)
+    pub fn encrypt_package(
+        &self,
+        decrypted_package: HashMap<String, Vec<u8>>,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        let mut encrypted_package = HashMap::new();
+        for (name, value) in decrypted_package {
+            let encrypted_value = self.encrypt(value)?;
+            encrypted_package.insert(name, encrypted_value);
+        }
+        Ok(encrypted_package)
     }
 
     fn get_ecc_aes_keys(&self) -> (Option<Vec<u8>>, Option<[u8; 32]>) {
@@ -129,6 +136,15 @@ impl PublicKey {
         let ciphertext = cipher.encrypt(&nonce, payload.as_slice())?;
 
         Ok(ciphertext)
+    }
+
+    pub fn calculate_id(&self, key_type: PublicKeyType) -> String {
+        let mut data = vec![key_type.to_string()];
+        for value in [self.ecc(), self.kem()].iter().flatten() {
+            data.push(value.to_string());
+        }
+
+        sha256_digest(&data)
     }
 }
 

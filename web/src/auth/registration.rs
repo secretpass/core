@@ -1,15 +1,16 @@
 use crate::auth::helpers::{get_credentials_container, parse_promise};
 use crate::auth::mapping::{
-    build_credential_request_extensions, map_browser_passkey_registration_response,
+    build_credential_request_extensions, exclude_credentials,
+    map_browser_passkey_registration_response,
 };
 use crate::passkeys::types::{PasskeyCreationOptions, PrfResults, RegistrationResponse};
 use crate::passkeys::{finish_registration, start_registration};
 use crate::session::SecureSession;
 use secretpass_core::{PasskeyResidency, SecretpassProject, SecretpassUser, StoredPublicKey};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tsify::Tsify;
-use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
+use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::js_sys::{Array as JsArray, Object as JsObject, Reflect as JsReflect};
 use web_sys::{
     AttestationConveyancePreference, AuthenticatorAttachment, AuthenticatorSelectionCriteria,
@@ -17,14 +18,18 @@ use web_sys::{
     PublicKeyCredentialUserEntity, UserVerificationRequirement,
 };
 
-#[derive(Debug, Deserialize, Tsify)]
+#[derive(Debug, Serialize, Deserialize, Tsify)]
 pub struct RegistrationParams {
-    name: String,
-    project: SecretpassProject,
-    user: SecretpassUser,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub exclude_keys: Vec<String>,
+    pub project: SecretpassProject,
+    pub user: SecretpassUser,
 }
 
-pub async fn register_user_bounded(params: RegistrationParams) -> anyhow::Result<StoredPublicKey> {
+pub async fn register_user_bounded(
+    passkey_name: String,
+    params: RegistrationParams,
+) -> anyhow::Result<StoredPublicKey> {
     let options = start_registration(&params.project, &params.user).await?;
 
     let (prf_results, reg_response) = browser_user_registration(&params, &options).await?;
@@ -33,7 +38,7 @@ pub async fn register_user_bounded(params: RegistrationParams) -> anyhow::Result
 
     let session = SecureSession::new(params.project.algorithm, prf_results)?;
 
-    Ok(session.build_public_key(params.name, &passkey))
+    Ok(session.build_public_key(passkey_name, &passkey))
 }
 
 async fn browser_user_registration(
@@ -65,6 +70,10 @@ async fn browser_user_registration(
     pk_options.set_timeout(60_000);
     pk_options.set_extensions(&extensions);
     pk_options.set_attestation(AttestationConveyancePreference::Direct);
+
+    if !params.exclude_keys.is_empty() {
+        pk_options.set_exclude_credentials(&exclude_credentials(&params.exclude_keys)?)
+    }
 
     let selection = AuthenticatorSelectionCriteria::new();
     selection.set_user_verification(UserVerificationRequirement::Required);

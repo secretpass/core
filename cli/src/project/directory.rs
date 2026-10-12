@@ -6,23 +6,23 @@ use std::{env, fs};
 #[derive(Debug, Clone)]
 pub struct WorkingDirectory {
     path: String,
-    is_cloud: bool,
 }
 
 impl WorkingDirectory {
-    pub fn new(defined_path: Option<String>, is_cloud: bool) -> Self {
+    pub fn new(defined_path: Option<String>) -> Self {
         let bin_wd = env::current_dir().unwrap();
         let path = if let Some(user_wd) = defined_path {
-            let path = Path::new(user_wd.as_str());
+            let err_msg = format!("Error resolving project directory `{user_wd}`");
+            let path = fs::canonicalize(Path::new(user_wd.as_str())).expect(&err_msg);
             if !path.is_dir() {
-                panic!("Working directory {user_wd} not found");
+                panic!("`{user_wd}` folder not found");
             }
 
-            user_wd
+            format!("{}", path.display())
         } else {
             format!("{}", bin_wd.display())
         };
-        Self { path, is_cloud }
+        Self { path }
     }
 
     pub fn path(&self) -> &Path {
@@ -30,16 +30,7 @@ impl WorkingDirectory {
     }
 
     pub fn short_path(&self) -> String {
-        let path = self.path();
-
-        if let Some(home_dir) = home::home_dir()
-            && let Ok(relative_path) = path.strip_prefix(&home_dir)
-        {
-            let short_path = Path::new("~").join(relative_path);
-            return format!("{}", short_path.display());
-        }
-
-        self.path.clone()
+        short_path(&self.path)
     }
 
     pub fn project_dir(&self) -> PathBuf {
@@ -82,6 +73,36 @@ impl WorkingDirectory {
         self.project_dir()
             .join(format!("secrets/{}/{}.json", env, secret_name))
     }
+
+    pub fn command_working_dir(&self, provided: Option<String>) -> anyhow::Result<PathBuf> {
+        if provided.is_none() {
+            return Ok(self.project_dir());
+        }
+
+        let user_wd = provided.unwrap();
+
+        let path = fs::canonicalize(self.path().join(user_wd.as_str())).map_err(|err| {
+            anyhow::format_err!("Error resolving project directory `{user_wd}`: {}", err)
+        })?;
+        if !path.is_dir() {
+            return Err(anyhow::format_err!("`{user_wd}` directory not found"));
+        }
+
+        Ok(path)
+    }
+}
+
+pub fn short_path(path: &String) -> String {
+    let path = Path::new(path);
+
+    if let Some(home_dir) = home::home_dir()
+        && let Ok(relative_path) = path.strip_prefix(&home_dir)
+    {
+        let short_path = Path::new("~").join(relative_path);
+        return format!("{}", short_path.display());
+    }
+
+    format!("{}", path.display())
 }
 
 static WORKING_DIRECTORY: OnceLock<WorkingDirectory> = OnceLock::new();
@@ -90,7 +111,7 @@ pub fn get_working_directory() -> WorkingDirectory {
     WORKING_DIRECTORY.get().unwrap().clone()
 }
 
-pub fn setup_working_directory(defined_path: Option<String>, is_cloud: bool) {
-    let wd = WorkingDirectory::new(defined_path, is_cloud);
+pub fn setup_working_directory(defined_path: Option<String>) {
+    let wd = WorkingDirectory::new(defined_path);
     WORKING_DIRECTORY.set(wd).unwrap();
 }

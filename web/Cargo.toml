@@ -17,16 +17,15 @@ getrandom_v2 = { package = "getrandom", version = "0.2", features = ["js"] }
 
 [dependencies]
 anyhow = { version = "1.0.104", features = ["backtrace"] }
-base64 = "0.23.1"
 chrono = { version = "0.4.45", features = ["wasm-bindgen"] }
 ciborium = "0.2.2"
 coset = "0.4.2"
 getrandom = { version = "0.4.3", features = ["wasm_js"] }
-p256 = "0.13"
+p256 = "0.14.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sha2 = "0.11.0"
-"secretpass-core" = { path = ".." }
+secretpass-core = { path = ".." }
 tsify = "0.5.8"
 wasm-bindgen = { version = "0.2.128" }
 wasm-bindgen-futures = "0.4.78"
@@ -59,3 +58,7 @@ features = [
     "AttestationConveyancePreference",
     "AuthenticatorAttachment",
 ]
+
+# Explicitly keep metadata during development builds to make debugging easier
+[package.metadata.wasm-pack.profile.dev.wasm-bindgen]
+dwarf-debug-info = true

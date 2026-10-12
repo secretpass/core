@@ -1,7 +1,7 @@
 use crate::passkeys::types::*;
 use coset::cbor::value::Value;
 use coset::{CborSerializable, CoseKey, Label};
-use p256::EncodedPoint;
+use p256::Sec1Point;
 use p256::ecdsa::signature::Verifier;
 use p256::ecdsa::{Signature, VerifyingKey};
 use secretpass_core::utils::{bin_decode, bin_encode};
@@ -160,9 +160,12 @@ fn verify_p256_signature(
         return Err(anyhow::anyhow!("Invalid coordinate length"));
     }
 
-    let encoded_point =
-        EncodedPoint::from_affine_coordinates(x.as_slice().into(), y.as_slice().into(), false);
-    let verifying_key = VerifyingKey::from_encoded_point(&encoded_point)
+    let sec_point = Sec1Point::from_affine_coordinates(
+        x.as_slice().try_into()?,
+        y.as_slice().try_into()?,
+        false,
+    );
+    let verifying_key = VerifyingKey::from_sec1_point(&sec_point)
         .map_err(|e| anyhow::format_err!("Invalid P-256 key: {e}"))?;
 
     let signature = Signature::from_der(signature_der)
@@ -193,7 +196,10 @@ pub async fn start_registration(
         },
         user: UserEntity {
             id: user.id.clone(),
-            name: user.username.clone(),
+            name: user
+                .username
+                .clone()
+                .ok_or_else(|| anyhow::format_err!("Username is required"))?,
             display_name: user.name.clone(),
         },
         challenge,

@@ -1,14 +1,14 @@
 use crate::enums::EncryptionAlgorithm;
-use crate::keys::derive::{
-    EccPrivateKey, EccPublicKey, KemPrivateKey, PrivateKeySeed, derive_ecc_keys, derive_kem_keys,
-};
+use crate::keys::derive::{EccPrivateKey, EccPublicKey, KemPrivateKey, PrivateKeySeed};
 use crate::keys::public::PublicKey;
 use crate::types::EncryptedPackage;
+use crate::utils::bin_deserialize;
 use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use anyhow::anyhow;
 use fips203::ml_kem_768::CipherText;
 use fips203::traits::{Decaps, SerDes};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct PrivateKey {
@@ -22,7 +22,7 @@ impl PrivateKey {
         let (ecc_public_key, ecc_private_key) = if seed.algorithm == EncryptionAlgorithm::ECC
             || seed.algorithm == EncryptionAlgorithm::Hybrid
         {
-            let (public_key, private_key) = derive_ecc_keys(&seed)?;
+            let (public_key, private_key) = seed.derive_ecc_keys()?;
             (Some(public_key), Some(private_key))
         } else {
             (None, None)
@@ -31,7 +31,7 @@ impl PrivateKey {
         let (kem_public_key, ken_private_key) = if seed.algorithm == EncryptionAlgorithm::KEM
             || seed.algorithm == EncryptionAlgorithm::Hybrid
         {
-            let (public_key, private_key) = derive_kem_keys(&seed)?;
+            let (public_key, private_key) = seed.derive_kem_keys()?;
             (Some(public_key), Some(private_key))
         } else {
             (None, None)
@@ -47,22 +47,33 @@ impl PrivateKey {
         Ok(private_key)
     }
 
-    pub fn decrypt(&self, payload: Vec<u8>) -> anyhow::Result<Vec<u8>> {
-        let encrypted_package = rmp_serde::from_slice::<EncryptedPackage>(payload.as_slice())?;
+    pub fn decrypt(&self, payload: &str) -> anyhow::Result<Vec<u8>> {
+        let encrypted_package: EncryptedPackage = bin_deserialize(payload)?;
 
         let ecc_shared_secret = self.get_ecc_aes_shared_secret(&encrypted_package)?;
         let kem_shared_secret = self.get_kem_aes_shared_secret(&encrypted_package)?;
-        let mut decrypted_payload = encrypted_package.payload.clone();
+        let mut decrypted_payload = encrypted_package.3.clone();
 
         for shared_secret in [kem_shared_secret, ecc_shared_secret].into_iter().flatten() {
-            decrypted_payload = Self::aes_decrypt_payload(
-                encrypted_package.nonce,
-                &shared_secret,
-                decrypted_payload,
-            )?
+            decrypted_payload =
+                Self::aes_decrypt_payload(encrypted_package.2, &shared_secret, decrypted_payload)?
         }
 
         Ok(decrypted_payload)
+    }
+
+    pub fn decrypt_package(
+        &self,
+        secrets_package: &HashMap<String, String>,
+    ) -> anyhow::Result<HashMap<String, Vec<u8>>> {
+        let mut decrypted_secrets = HashMap::new();
+
+        for (key, value) in secrets_package {
+            let decrypted_payload = self.decrypt(value)?;
+            decrypted_secrets.insert(key.to_string(), decrypted_payload);
+        }
+
+        Ok(decrypted_secrets)
     }
 
     fn aes_decrypt_payload(
@@ -82,10 +93,10 @@ impl PrivateKey {
         &self,
         encrypted_package: &EncryptedPackage,
     ) -> anyhow::Result<Option<[u8; 32]>> {
-        if self.ecc.is_none() && encrypted_package.ecc_public_key.is_none() {
+        if self.ecc.is_none() && encrypted_package.0.is_none() {
             return Ok(None);
         }
-        if self.ecc.is_none() || encrypted_package.ecc_public_key.is_none() {
+        if self.ecc.is_none() || encrypted_package.0.is_none() {
             return Err(anyhow!("Invalid payload/private key"));
         }
 
@@ -101,10 +112,10 @@ impl PrivateKey {
         &self,
         encrypted_package: &EncryptedPackage,
     ) -> anyhow::Result<Option<[u8; 32]>> {
-        if self.kem.is_none() && encrypted_package.kem_ciphertext.is_none() {
+        if self.kem.is_none() && encrypted_package.1.is_none() {
             return Ok(None);
         }
-        if self.kem.is_none() || encrypted_package.kem_ciphertext.is_none() {
+        if self.kem.is_none() || encrypted_package.1.is_none() {
             return Err(anyhow!("Invalid payload/private key"));
         }
 

@@ -5,22 +5,13 @@ use crate::auth::mapping::{
 use crate::passkeys::types::{LoginResponse, PasskeyRequestOptions, PrfResults};
 use crate::passkeys::{finish_login, start_login};
 use crate::session::SecureSession;
-use secretpass_core::{SecretpassProject, SecretpassUser, StoredPublicKey};
-use serde::Deserialize;
-use tsify::Tsify;
+use secretpass_core::{LoginParams, StoredPublicKey};
 use web_sys::{
     CredentialRequestOptions, PublicKeyCredentialRequestOptions, UserVerificationRequirement,
 };
 
-#[derive(Debug, Deserialize, Tsify)]
-pub struct LoginParams {
-    pub project: SecretpassProject,
-    pub user: SecretpassUser,
-    pub public_keys: Vec<StoredPublicKey>,
-}
-
 pub async fn login_user_bounded(
-    params: LoginParams,
+    params: &LoginParams,
 ) -> anyhow::Result<(StoredPublicKey, SecureSession)> {
     let login_options = start_login()?;
 

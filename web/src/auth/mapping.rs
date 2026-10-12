@@ -1,6 +1,7 @@
 use crate::passkeys::types::{
     AssertionResponse, AttestationResponse, LoginResponse, PrfResults, RegistrationResponse,
 };
+use secretpass_core::utils::bin_decode;
 use secretpass_core::{SecretpassProject, SecretpassUser, StoredPublicKey};
 use sha2::{Digest, Sha256};
 use wasm_bindgen::{JsCast, JsValue};
@@ -141,6 +142,26 @@ pub fn allowed_credentials(public_keys: &[StoredPublicKey]) -> anyhow::Result<Js
             .clone()
             .ok_or_else(|| anyhow::format_err!("Missing passkey in public key {}", pk.id))?;
         let id = Uint8Array::new_from_slice(&passkey.id_bytes()?);
+
+        let object = JsObject::new();
+        JsReflect::set(
+            &object,
+            &JsValue::from_str("type"),
+            &JsValue::from_str("public-key"),
+        )
+        .unwrap();
+        JsReflect::set(&object, &JsValue::from_str("id"), &id).unwrap();
+
+        credentials.push(&object);
+    }
+
+    Ok(JsValue::from(credentials))
+}
+
+pub fn exclude_credentials(public_keys: &[String]) -> anyhow::Result<JsValue> {
+    let credentials = JsArray::new();
+    for pk_id in public_keys {
+        let id = Uint8Array::new_from_slice(&bin_decode(pk_id)?);
 
         let object = JsObject::new();
         JsReflect::set(

@@ -4,8 +4,9 @@ use tsify::Tsify;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
 pub struct SecretpassUser {
-    pub id: String,       // Fixed - invalidates keys if changed
-    pub username: String, // Fixed - invalidates keys if changed
+    pub id: String, // Fixed - invalidates keys if changed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>, // Fixed - invalidates keys if changed
     pub name: String,
     pub level: UserLevel, // Fixed - invalidates keys if changed
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -15,10 +16,7 @@ pub struct SecretpassUser {
 
 impl SecretpassUser {
     pub fn prf_salt(&self) -> String {
-        format!(
-            "{}-{}-{}-{}",
-            self.id, self.username, self.level, self.created_at
-        )
+        format!("{}-{:?}-{}", self.id, self.username, self.created_at)
     }
 
     pub fn has_access(&self, env_name: String) -> bool {

@@ -17,7 +17,7 @@ import {
   NewEnvironmentsSchema,
   type RegistrationState,
 } from "@/features/setup/project/types.ts";
-import type { ComplexState } from "@/utils.ts";
+import { type ComplexState, clone } from "@/utils.ts";
 
 export function EnvironmentDefinitions({
   stepper,
@@ -68,12 +68,14 @@ export function EnvironmentDefinitions({
           aria-label="Add Environment"
           isDisabled={!is_valid && state.environments.length > 0}
           variant="ghost"
-          onClick={() =>
-            state.complexUpdate((nextState) => {
-              nextState.environments.push({ name: "", description: undefined });
-              nextState.environments = [...nextState.environments];
-            })
-          }
+          onClick={() => {
+            state.update({
+              environments: clone(state.environments, (environments) => {
+                environments.push({ name: "", description: undefined });
+                return environments;
+              }),
+            });
+          }}
         >
           Add Environment
         </Button>
@@ -121,8 +123,11 @@ function EnvironmentEditor({
           className="grow"
           value={env.name}
           onChange={(e) => {
-            state.complexUpdate((state) => {
-              state.environments[index].name = e.target.value;
+            state.update({
+              environments: clone(state.environments, (environments) => {
+                environments[index].name = e.target.value;
+                return environments;
+              }),
             });
           }}
         />
@@ -133,8 +138,11 @@ function EnvironmentEditor({
             className="text-muted hover:text-danger"
             isIconOnly
             onClick={() => {
-              state.complexUpdate((nextState) => {
-                nextState.environments.splice(index, 1);
+              state.update({
+                environments: clone(state.environments, (environments) => {
+                  environments.splice(index, 1);
+                  return environments;
+                }),
               });
             }}
           >
@@ -149,10 +157,13 @@ function EnvironmentEditor({
         variant="secondary"
         value={env.description || ""}
         onChange={(e) => {
-          state.complexUpdate((nextState) => {
-            nextState.environments[index].description = e.target.value
-              ? e.target.value
-              : undefined;
+          state.update({
+            environments: clone(state.environments, (environments) => {
+              environments[index].description = e.target.value
+                ? e.target.value
+                : undefined;
+              return environments;
+            }),
           });
         }}
       />

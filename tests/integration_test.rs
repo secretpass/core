@@ -49,7 +49,7 @@ fn test_ecc_encryption_decryption() {
         .unwrap();
     assert_ne!(
         original_payload,
-        encrypted_payload.as_slice(),
+        encrypted_payload.as_bytes(),
         "encrypted payload cannot be equal to the clear payload"
     );
     assert_ne!(
@@ -61,20 +61,20 @@ fn test_ecc_encryption_decryption() {
         "encrypted payload should change with every encryption run"
     );
 
-    let decrypted_payload = ecc_key.decrypt(encrypted_payload.clone()).unwrap();
+    let decrypted_payload = ecc_key.decrypt(&encrypted_payload).unwrap();
     assert_eq!(
         decrypted_payload, original_payload,
         "decrypted payload should be equal to the original payload"
     );
 
-    let kem_error = kem_key.decrypt(encrypted_payload.clone()).unwrap_err();
+    let kem_error = kem_key.decrypt(&encrypted_payload).unwrap_err();
     assert_eq!(
         kem_error.to_string(),
         "Invalid payload/private key",
         "attempting to decrypt ECC payload with KEM key should throw an error"
     );
 
-    let hybrid_error = hybrid_key.decrypt(encrypted_payload.clone()).unwrap_err();
+    let hybrid_error = hybrid_key.decrypt(&encrypted_payload).unwrap_err();
     assert_eq!(
         hybrid_error.to_string(),
         "Invalid payload/private key",
@@ -94,7 +94,7 @@ fn test_kem_encryption_decryption() {
         .unwrap();
     assert_ne!(
         original_payload,
-        encrypted_payload.as_slice(),
+        encrypted_payload.as_bytes(),
         "encrypted payload cannot be equal to the clear payload"
     );
     assert_ne!(
@@ -106,20 +106,20 @@ fn test_kem_encryption_decryption() {
         "encrypted payload should change with every encryption run"
     );
 
-    let decrypted_payload = kem_key.decrypt(encrypted_payload.clone()).unwrap();
+    let decrypted_payload = kem_key.decrypt(&encrypted_payload).unwrap();
     assert_eq!(
         decrypted_payload, original_payload,
         "decrypted payload should be equal to the original payload"
     );
 
-    let ecc_error = ecc_key.decrypt(encrypted_payload.clone()).unwrap_err();
+    let ecc_error = ecc_key.decrypt(&encrypted_payload).unwrap_err();
     assert_eq!(
         ecc_error.to_string(),
         "Invalid payload/private key",
         "attempting to decrypt KEM payload with ECC key should throw an error"
     );
 
-    let hybrid_error = hybrid_key.decrypt(encrypted_payload.clone()).unwrap_err();
+    let hybrid_error = hybrid_key.decrypt(&encrypted_payload).unwrap_err();
     assert_eq!(
         hybrid_error.to_string(),
         "Invalid payload/private key",
@@ -139,7 +139,7 @@ fn test_hybrid_encryption_decryption() {
         .unwrap();
     assert_ne!(
         original_payload,
-        encrypted_payload.as_slice(),
+        encrypted_payload.as_bytes(),
         "encrypted payload cannot be equal to the clear payload"
     );
     assert_ne!(
@@ -151,20 +151,20 @@ fn test_hybrid_encryption_decryption() {
         "encrypted payload should change with every encryption run"
     );
 
-    let decrypted_payload = hybrid_key.decrypt(encrypted_payload.clone()).unwrap();
+    let decrypted_payload = hybrid_key.decrypt(&encrypted_payload).unwrap();
     assert_eq!(
         decrypted_payload, original_payload,
         "decrypted payload should be equal to the original payload"
     );
 
-    let ecc_error = ecc_key.decrypt(encrypted_payload.clone()).unwrap_err();
+    let ecc_error = ecc_key.decrypt(&encrypted_payload).unwrap_err();
     assert_eq!(
         ecc_error.to_string(),
         "Invalid payload/private key",
         "attempting to decrypt Hybrid payload with ECC key should throw an error"
     );
 
-    let kem_error = kem_key.decrypt(encrypted_payload.clone()).unwrap_err();
+    let kem_error = kem_key.decrypt(&encrypted_payload).unwrap_err();
     assert_eq!(
         kem_error.to_string(),
         "Invalid payload/private key",

@@ -1,5 +1,6 @@
-import { Button, Description, IconPlus } from "@heroui/react";
+import { Description } from "@heroui/react";
 import clsx from "clsx";
+import { useMemo } from "react";
 import type { SecretpassEnvironment } from "@/core/web";
 import { useSecretManager } from "@/manager/provider";
 import { CreateEnvironment } from "./new-environment";
@@ -12,10 +13,17 @@ export function EnvironmentsSidebar({
   onSelection: (env: string) => void;
 }) {
   const manager = useSecretManager();
+  const environments = useMemo(
+    () =>
+      manager.config.environments.filter(
+        (env) => !!manager.lock_package[env.name],
+      ),
+    [manager.config.environments, manager.lock_package],
+  );
 
   return (
     <div className="bg-background h-full py-4 px-2 rounded-2xl w-1/3 overflow-y-auto relative grid-cols-1">
-      {manager.config.environments.map((env) => (
+      {environments.map((env) => (
         <EnvironmentItem
           key={env.name}
           is_active={selected === env.name}
@@ -24,7 +32,9 @@ export function EnvironmentsSidebar({
         />
       ))}
 
-      <CreateEnvironment setActiveEnvironment={onSelection} />
+      {manager.user.level === "Admin" && (
+        <CreateEnvironment setActiveEnvironment={onSelection} />
+      )}
     </div>
   );
 }

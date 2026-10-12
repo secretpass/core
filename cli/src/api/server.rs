@@ -1,6 +1,7 @@
-use crate::api::environment::environment_routes;
 use crate::api::project::project_routes;
+use crate::api::run::command_run_routes;
 use crate::api::secret::secrets_routes;
+use crate::api::support::support_routes;
 use crate::api::users::user_routes;
 use crate::project::get_working_directory;
 use axum::Router;
@@ -9,12 +10,13 @@ use axum::http::HeaderValue;
 use axum::middleware;
 use axum::response::Response;
 
-pub async fn serve_local_server(cloud: bool, cloud_origin: String) {
+pub async fn serve_local_server(cloud: bool, cloud_origin: String, no_support: bool) {
     let app = Router::new()
         .merge(project_routes())
         .merge(user_routes())
-        .merge(environment_routes())
         .merge(secrets_routes())
+        .merge(command_run_routes())
+        .merge(support_routes(no_support))
         .layer(middleware::from_fn(add_dir_header));
 
     // Run the API on port 5000 proxied by vite while in debug mode

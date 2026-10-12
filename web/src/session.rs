@@ -1,8 +1,8 @@
 use crate::passkeys::types::PrfResults;
-use secretpass_core::utils::sha256_digest;
 use secretpass_core::{
     EncryptionAlgorithm, Passkey, PrivateKey, PrivateKeySeed, PublicKeyType, StoredPublicKey,
 };
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct SecureSession {
@@ -22,30 +22,26 @@ impl SecureSession {
         Ok(Self { private_key })
     }
 
-    pub fn decrypt(&self, cipher: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+    pub fn decrypt(&self, cipher: &str) -> anyhow::Result<Vec<u8>> {
         self.private_key.decrypt(cipher)
+    }
+
+    pub fn decrypt_package(
+        &self,
+        secrets_package: &HashMap<String, String>,
+    ) -> anyhow::Result<HashMap<String, Vec<u8>>> {
+        self.private_key.decrypt_package(secrets_package)
     }
 
     pub fn build_public_key(&self, name: String, passkey: &Passkey) -> StoredPublicKey {
         let public_key = self.private_key.public_key();
-        let ecc = public_key.ecc();
-        let kem = public_key.kem();
-
-        let id_salt = format!(
-            "{}-{}-{}",
-            PublicKeyType::User,
-            ecc.clone().unwrap_or(String::from("null")),
-            kem.clone().unwrap_or(String::from("null"))
-        );
-
-        let id = sha256_digest(&id_salt);
 
         StoredPublicKey {
-            id,
+            id: public_key.calculate_id(PublicKeyType::User),
             name,
             type_: PublicKeyType::User,
-            ecc,
-            kem,
+            ecc: public_key.ecc(),
+            kem: public_key.kem(),
             passkey: Some(passkey.clone()),
         }
     }

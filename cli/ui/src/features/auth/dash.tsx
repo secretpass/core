@@ -1,8 +1,8 @@
 import { Button, Card } from "@heroui/react";
-import { IconArrowLeft } from "@tabler/icons-react";
+import { IconArrowLeft, IconFolder } from "@tabler/icons-react";
 import { useState } from "react";
 import type { SecretpassProject } from "@/core/web";
-import type { SecretMangerState } from "@/manager";
+import { CreatePasskeyScreen } from "./create-passkey";
 import { LoginScreen } from "./login";
 
 export enum ActiveView {
@@ -18,7 +18,7 @@ export function LoginDashboard({
 }: {
   directory: string;
   project: SecretpassProject;
-  onAuthComplete: (state: SecretMangerState) => void;
+  onAuthComplete: (public_key_id: string) => void;
 }) {
   const [active_view, setActiveView] = useState<ActiveView>(
     ActiveView.Dashboard,
@@ -26,9 +26,9 @@ export function LoginDashboard({
 
   return (
     <div className="content flex flex-col items-center justify-center">
-      <Card className={"w-full max-w-xl"}>
+      <Card className="w-full max-w-5xl">
         {active_view === ActiveView.Dashboard && (
-          <Card.Header className="text-center">
+          <Card.Header className="text-center mb-8">
             <Card.Title>Welcome!</Card.Title>
             <Card.Description>
               You're running secretpass locally
@@ -37,7 +37,17 @@ export function LoginDashboard({
         )}
         {active_view === ActiveView.UserSetup && (
           <Card.Header>
-            <Card.Title>Create Passkey</Card.Title>
+            <Card.Title className="flex gap-2 items-center">
+              <Button
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                onClick={() => setActiveView(ActiveView.Dashboard)}
+              >
+                <IconArrowLeft />
+              </Button>{" "}
+              Create Passkey
+            </Card.Title>
             <Card.Description>
               Setup a passkey for an existing project
             </Card.Description>
@@ -85,6 +95,18 @@ export function LoginDashboard({
           <Card.Content className="mt-4">
             <LoginScreen project={project} onAuthComplete={onAuthComplete} />
           </Card.Content>
+        )}
+        {active_view === ActiveView.UserSetup && (
+          <Card.Content className="mt-4">
+            <CreatePasskeyScreen />
+          </Card.Content>
+        )}
+        {active_view === ActiveView.Dashboard && (
+          <Card.Footer className="mt-10">
+            <div className="text-muted text-sm flex gap-1 items-center justify-center w-full">
+              <IconFolder className="size-5" /> <pre>{directory}</pre>
+            </div>
+          </Card.Footer>
         )}
       </Card>
     </div>

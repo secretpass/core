@@ -3,12 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import initCore, { type SecretpassProject } from "@/core/web";
 import { Navbar } from "@/features/navigation";
 import { NewProjectSetup } from "@/features/setup";
-import {
-  SecretManagerProvider,
-  SecretManagerView,
-  type SecretMangerState,
-} from "@/manager";
+import { SecretManagerProvider, SecretManagerView } from "@/manager";
 import { CWD_HEADER } from "./constants";
+import { useAnalytics } from "./features/analytics/provider";
 import { LoginDashboard } from "./features/auth/dash";
 import { makeRequest, useComplexState } from "./utils";
 
@@ -17,11 +14,10 @@ export function App() {
     loading: boolean;
     directory: string | null;
     project: SecretpassProject | null;
-  }>({ loading: true, project: null, directory: null });
+  }>(() => ({ loading: true, project: null, directory: null }));
 
-  const [sm_state, setSecretManagerState] = useState<SecretMangerState | null>(
-    null,
-  );
+  const [public_key_id, setPublicKeyId] = useState<string | null>(null);
+  const analytics = useAnalytics();
 
   useEffect(() => {
     state.update({ loading: true });
@@ -33,23 +29,30 @@ export function App() {
           directory: response.headers.get(CWD_HEADER),
         });
         if (response.ok) {
-          state.update({ project: response.json() });
+          const project = response.json();
+
+          analytics?.group("local-project", project.id, {
+            name: project.name,
+            algorithm: project.algorithm,
+            residency: project.residency,
+          });
+          state.update({ project: project });
         }
       })
       .finally(() => state.update({ loading: false }));
-  }, [state.update]);
+  }, [state.update, analytics]);
 
   const is_new_project = useMemo(
-    () => !state.loading && state.project === null && sm_state === null,
-    [state.loading, state.project, sm_state],
+    () => !state.loading && state.project === null && public_key_id === null,
+    [state.loading, state.project, public_key_id],
   );
   const is_pending_login = useMemo(
-    () => !state.loading && state.project !== null && sm_state === null,
-    [state.loading, state.project, sm_state],
+    () => !state.loading && state.project !== null && public_key_id === null,
+    [state.loading, state.project, public_key_id],
   );
   const is_logged_in = useMemo(
-    () => !state.loading && sm_state !== null,
-    [state.loading, sm_state],
+    () => !state.loading && public_key_id !== null,
+    [state.loading, public_key_id],
   );
 
   return (
@@ -65,11 +68,11 @@ export function App() {
       {is_new_project && (
         <NewProjectSetup
           directory={state.directory as string}
-          onAuthComplete={setSecretManagerState}
+          onAuthComplete={setPublicKeyId}
         />
       )}
       {is_logged_in && (
-        <SecretManagerProvider state={sm_state as SecretMangerState}>
+        <SecretManagerProvider public_key_id={public_key_id as string}>
           <SecretManagerView />
         </SecretManagerProvider>
       )}
@@ -77,7 +80,7 @@ export function App() {
         <LoginDashboard
           directory={state.directory as string}
           project={state.project as SecretpassProject}
-          onAuthComplete={setSecretManagerState}
+          onAuthComplete={setPublicKeyId}
         />
       )}
     </main>

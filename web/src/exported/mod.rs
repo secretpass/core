@@ -2,5 +2,5 @@
 
 mod authorize;
 mod encrypt;
+mod machine;
 mod register;
-mod user_login;

@@ -1,9 +1,9 @@
 import { Chip, Tabs } from "@heroui/react";
 import {
   IconFlask,
+  IconSettings,
   IconShield,
   IconUser,
-  IconUsers,
 } from "@tabler/icons-react";
 import { useMemo } from "react";
 import { useSecretManager } from "../provider";
@@ -34,7 +34,7 @@ export function SecretManagerTabs({
           </Tabs.Tab>
           <Tabs.Tab id="administration">
             <span className="flex gap-1 items-center">
-              <IconUsers className="size-4" />
+              <IconSettings className="size-4" />
               Administration
             </span>
             <Tabs.Indicator />

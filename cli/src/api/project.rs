@@ -1,16 +1,28 @@
 use crate::api::dto::{CreateProjectDTO, UpdateProjectDTO};
-use crate::api::manager::{ACTIVE_MANAGER, get_readonly_manager, get_readwrite_manager};
-use crate::project::BackendManager;
+use crate::manager::{ACTIVE_MANAGER, get_readonly_manager, get_readwrite_manager};
+use crate::project::{BackendManager, get_working_directory};
+use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
-use secretpass_core::{OperationMode, SecretManagerConfig, SecretpassProject};
+use secretpass_core::{
+    OperationMode, SecretManagerConfig, SecretpassProject, UserApplicationState,
+};
 use std::sync::Mutex;
 
 async fn get_project() -> Result<Json<SecretpassProject>, (StatusCode, String)> {
     let manager = get_readonly_manager()?;
 
     Ok(Json(manager.config.project))
+}
+
+async fn get_project_state(
+    Path(key_id): Path<String>,
+) -> Result<Json<UserApplicationState>, (StatusCode, String)> {
+    let manager = get_readonly_manager()?;
+    let state = manager.get_user_application_state(&key_id)?;
+
+    Ok(Json(state))
 }
 
 async fn create_project(
@@ -23,8 +35,10 @@ async fn create_project(
             String::from("Secretpass project already exists"),
         ));
     }
+    let dir = get_working_directory();
 
     let mut manager = BackendManager {
+        dir,
         config: SecretManagerConfig {
             mode: OperationMode::Local,
             project: data.project,
@@ -73,8 +87,10 @@ async fn update_project(Json(data): Json<UpdateProjectDTO>) -> Result<(), (Statu
 }
 
 pub fn project_routes() -> Router {
-    Router::new().route(
-        "/api/project",
-        get(get_project).post(create_project).patch(update_project),
-    )
+    Router::new()
+        .route(
+            "/api/project",
+            get(get_project).post(create_project).patch(update_project),
+        )
+        .route("/api/project/state/{key_id}", get(get_project_state))
 }

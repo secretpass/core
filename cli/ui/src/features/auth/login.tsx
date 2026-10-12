@@ -1,23 +1,16 @@
-import {
-  Alert,
-  Button,
-  Description,
-  Input,
-  Label,
-  TextField,
-} from "@heroui/react";
+import { Button, Description, Input, Label, TextField } from "@heroui/react";
 import { IconFingerprint } from "@tabler/icons-react";
 import { useCallback, useMemo, useState } from "react";
 import * as z from "zod";
+import { ErrorDisplay, useError } from "@/components";
 import { LoadingCircle } from "@/components/loader";
 import {
-  type ProcessUserLoginResponse,
-  process_user_login,
+  authorize_operation,
+  type LoginParams,
   type SecretpassProject,
-  type UserLockPackage,
 } from "@/core/web";
-import type { SecretMangerState } from "@/manager";
-import { makeRequest } from "@/utils";
+import { resolveRequest } from "@/utils";
+import { useAnalytics } from "../analytics/provider";
 
 const email_schema = z.email();
 
@@ -26,47 +19,48 @@ export function LoginScreen({
   onAuthComplete,
 }: {
   project: SecretpassProject;
-  onAuthComplete: (state: SecretMangerState) => void;
+  onAuthComplete: (public_key_id: string) => void;
 }) {
+  const analytics = useAnalytics();
   const [username, setUsername] = useState("");
-  const [is_loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const error = useError();
 
   const is_valid = useMemo(() => email_schema.validate(username), [username]);
 
-  const completeLogin = useCallback(() => {
-    setError(null);
-    const url = new URL("/api/user/lock-package", window.location.origin);
+  const completeLogin = useCallback(async () => {
+    const url = new URL("/api/user/login-params", window.location.origin);
     url.search = new URLSearchParams({ username }).toString();
 
-    setLoading(true);
-    makeRequest<UserLockPackage>(url)
-      .then((response) => {
-        if (response.ok) {
-          return response;
-        }
-        throw response.text;
-      })
-      .then(async (response) => {
-        const directory = response.headers.get(
-          "x-current-working-directory",
-        ) as string;
-        const lock_package = response.json();
-        const result: ProcessUserLoginResponse = JSON.parse(
-          await process_user_login(JSON.stringify(lock_package)),
-        );
+    const login_details_result = await error.catch(
+      "Error fetching login details",
+      () => resolveRequest<LoginParams>(url),
+      "fetch_login_details",
+    );
 
-        onAuthComplete({
-          user: lock_package.user,
-          config: result.config,
-          directory,
-          public_key: result.public_key,
-          public_keys: result.public_keys,
-        });
-      })
-      .catch((err) => setError(String(err)))
-      .finally(() => setLoading(false));
-  }, [username, onAuthComplete]);
+    if (!login_details_result.ok) {
+      return;
+    }
+
+    const lock_package = login_details_result.result;
+    const auth_result = await error.catch(
+      "Error authorizing login",
+      () => authorize_operation(JSON.stringify(lock_package)),
+      "authorize_login",
+    );
+    if (!auth_result.ok) {
+      return;
+    }
+
+    analytics?.identify(lock_package.user.id, {
+      email: lock_package.user.username,
+      name: lock_package.user.name,
+      level: lock_package.user.level,
+    });
+
+    analytics?.capture("user_logged_in");
+
+    onAuthComplete(auth_result.result);
+  }, [username, onAuthComplete, analytics, error.catch]);
 
   return (
     <div className="flex flex-col gap-8 grow">
@@ -85,25 +79,17 @@ export function LoginScreen({
         />
       </TextField>
 
-      {error && (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Error attempting to login</Alert.Title>
-            <Alert.Description>{error}</Alert.Description>
-          </Alert.Content>
-        </Alert>
-      )}
+      <ErrorDisplay value={error.value} />
 
       <div className="flex justify-end">
         <Button
-          isDisabled={is_loading || !is_valid}
+          isDisabled={error.is_pending || !is_valid}
           aria-label="Register Passkey"
           size="lg"
           onClick={completeLogin}
         >
-          {!is_loading && <IconFingerprint />}
-          {is_loading && (
+          {!error.is_pending && <IconFingerprint />}
+          {error.is_pending && (
             <LoadingCircle aria-label="Loading" size="sm" isIndeterminate />
           )}
           Authorize and Login
