@@ -127,21 +127,8 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
-
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
-
-      - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
-
-      # Installs Bun, needed for building CLI Web App
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      # Build UI
-      - name: Build and Bundle Local UI
-        run: make bundle
-
       # Get the dist-manifest
       - name: Fetch local artifacts
         uses: actions/download-artifact@v8

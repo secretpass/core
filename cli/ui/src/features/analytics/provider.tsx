@@ -52,7 +52,6 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
           ...AnalyticsExtensions,
         },
         loaded: () => {
-          posthog.conversations?.show();
           setClient(posthog);
         },
       });
