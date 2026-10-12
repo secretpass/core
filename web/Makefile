@@ -24,7 +24,7 @@ local:
 	RUSTFLAGS='--cfg web_sys_unstable_apis' \
 	cargo rustc -p web --release --crate-type cdylib --target wasm32-unknown-unknown
 	wasm-bindgen \
-      ./target/wasm32-unknown-unknown/release/web.wasm \
+      ../target/wasm32-unknown-unknown/release/web.wasm \
       --target web \
       --out-dir ../cli/ui/src/core
 
@@ -42,9 +42,9 @@ cloud:
 	RUSTFLAGS='--cfg web_sys_unstable_apis' \
 	cargo rustc -p web --release --crate-type cdylib --target wasm32-unknown-unknown
 	wasm-bindgen \
-	  ./target/wasm32-unknown-unknown/release/web.wasm \
+	  ../target/wasm32-unknown-unknown/release/web.wasm \
 	  --target web \
-	  --out-dir ./target/dist
+	  --out-dir ../target/dist
 
 
 # ------------------------------------------------------------------------------
