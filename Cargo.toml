@@ -1,3 +1,10 @@
+[workspace]
+members = [
+    "cli",
+    "web",
+]
+resolver = "2"
+
 [package]
 name = "secretpass-core"
 version = "0.1.0"
@@ -6,7 +13,6 @@ edition = "2024"
 [lib]
 # This library is used in cli and also as part of the cloud for on device encryption and decryption
 crate-type = ["cdylib", "rlib"]
-
 
 [dependencies]
 aes-gcm = { version = "0.11.1", features = ["getrandom"] }
