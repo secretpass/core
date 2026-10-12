@@ -4,7 +4,7 @@
 
 - name: Export Rust Flags on Windows
   run: |
-    (echo "RUSTFLAGS=--cfg=web_sys_unstable_apis --linker-flavor=wasm-lld" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append) || echo ""
+    (echo "RUSTFLAGS=--cfg=web_sys_unstable_apis -C linker-flavor=wasm-lld" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append) || echo ""
 
 - name: Setup Bun
   uses: oven-sh/setup-bun@v2
