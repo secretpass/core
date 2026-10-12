@@ -21,7 +21,7 @@ local:
 	WEBAUTH_RP_ID="secretpass.localhost" \
 	WEBAUTH_RP_ORIGIN="http://secretpass.localhost" \
 	WEBAUTH_RP_ENTITY="Secretpass Local" \
-	RUSTFLAGS='--cfg web_sys_unstable_apis' \
+	RUSTFLAGS='--cfg=web_sys_unstable_apis' \
 	cargo rustc -p web --release --crate-type cdylib --target wasm32-unknown-unknown
 	wasm-bindgen \
       ../target/wasm32-unknown-unknown/release/web.wasm \
@@ -39,7 +39,7 @@ cloud:
 	WEBAUTH_RP_ID="secretpass.cloud" \
 	WEBAUTH_RP_ORIGIN="https://secretpass.cloud" \
 	WEBAUTH_RP_ENTITY="Secretpass Cloud" \
-	RUSTFLAGS='--cfg web_sys_unstable_apis' \
+	RUSTFLAGS='--cfg=web_sys_unstable_apis' \
 	cargo rustc -p web --release --crate-type cdylib --target wasm32-unknown-unknown
 	wasm-bindgen \
 	  ../target/wasm32-unknown-unknown/release/web.wasm \
