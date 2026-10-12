@@ -139,8 +139,6 @@ jobs:
           "bun-version": "latest"
       - name: "Install wasm-bindgen-cli"
         run: "cargo install -f wasm-bindgen-cli"
-      - name: "Install wasm target"
-        run: "rustup target add wasm32-unknown-unknown"
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest

@@ -8,6 +8,3 @@
 
 - name: Install wasm-bindgen-cli
   run: cargo install -f wasm-bindgen-cli
-
-- name: Install wasm target
-  run: rustup target add wasm32-unknown-unknown

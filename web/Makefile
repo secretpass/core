@@ -8,10 +8,15 @@
 all: help
 
 
+add-target:
+	@echo "==> add wasm target"
+	rustup target add wasm32-unknown-unknown
+
 # ------------------------------------------------------------------------------
 # Library Local Build
 # ------------------------------------------------------------------------------
 local:
+	$(MAKE) add-target
 	@echo "==> Building WASM for cli server usage"
 	WEBAUTH_RP_ID="secretpass.localhost" \
 	WEBAUTH_RP_ORIGIN="http://secretpass.localhost" \
@@ -29,6 +34,7 @@ local:
 # Library Cloud Build
 # ------------------------------------------------------------------------------
 cloud:
+	$(MAKE) add-target
 	@echo "==> Building WASM for cli server usage"
 	WEBAUTH_RP_ID="secretpass.cloud" \
 	WEBAUTH_RP_ORIGIN="https://secretpass.cloud" \
