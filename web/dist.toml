@@ -1,0 +1,3 @@
+[dist]
+dist = false
+targets = ["wasm32-unknown-unknown"]
