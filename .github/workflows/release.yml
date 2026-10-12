@@ -137,8 +137,8 @@ jobs:
         uses: "oven-sh/setup-bun@v2"
         with:
           "bun-version": "latest"
-      - name: "Install wasm-pack"
-        run: "curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh"
+      - name: "Install wasm-bindgen-cli"
+        run: "cargo install -f wasm-bindgen-cli"
       - name: "Install wasm target"
         run: "rustup target add wasm32-unknown-unknown"
       - name: Install dist

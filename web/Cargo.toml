@@ -7,9 +7,6 @@ authors = { workspace = true }
 description = { workspace = true }
 homepage = { workspace = true }
 
-[lib]
-# This library is used exclusively in the browser as part of the cloud for on device encryption and decryption
-crate-type = ["cdylib"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom_v2 = { package = "getrandom", version = "0.2", features = ["js"] }
@@ -57,7 +54,3 @@ features = [
     "AttestationConveyancePreference",
     "AuthenticatorAttachment",
 ]
-
-# Explicitly keep metadata during development builds to make debugging easier
-[package.metadata.wasm-pack.profile.dev.wasm-bindgen]
-dwarf-debug-info = true

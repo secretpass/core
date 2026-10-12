@@ -7,8 +7,6 @@
 # Default target when running `make`
 all: help
 
-# Shared configuration
-WASM_TARGET    ?= web
 
 # ------------------------------------------------------------------------------
 # Library Local Build
@@ -19,11 +17,12 @@ local:
 	WEBAUTH_RP_ORIGIN="http://secretpass.localhost" \
 	WEBAUTH_RP_ENTITY="Secretpass Local" \
 	RUSTFLAGS='--cfg web_sys_unstable_apis' \
-	wasm-pack build \
-		--target $(WASM_TARGET) \
-		--release \
-		--no-pack \
-		--out-dir ../cli/ui/src/core
+	cargo rustc -p web --release --crate-type cdylib --target wasm32-unknown-unknown
+	wasm-bindgen \
+      ./target/wasm32-unknown-unknown/release/web.wasm \
+      --target web \
+      --out-dir ../cli/ui/src/core
+
 
 
 # ------------------------------------------------------------------------------
@@ -35,10 +34,11 @@ cloud:
 	WEBAUTH_RP_ORIGIN="https://secretpass.cloud" \
 	WEBAUTH_RP_ENTITY="Secretpass Cloud" \
 	RUSTFLAGS='--cfg web_sys_unstable_apis' \
-	wasm-pack build \
-		--target $(WASM_TARGET) \
-		--release \
-		--scope secretpass
+	cargo rustc -p web --release --crate-type cdylib --target wasm32-unknown-unknown
+	wasm-bindgen \
+	  ./target/wasm32-unknown-unknown/release/web.wasm \
+	  --target web \
+	  --out-dir ./target/dist
 
 
 # ------------------------------------------------------------------------------
