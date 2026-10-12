@@ -5,10 +5,27 @@ members = [
 ]
 resolver = "2"
 
-[package]
-name = "secretpass-core"
+[workspace.package]
 version = "0.1.0-prerelease-1"
 edition = "2024"
+repository = "https://github.com/secretpass/core"
+authors = ["Secretpass Inc", "Billcountry Mwaniki"]
+description = "Secretpass cli allows you to manage secrets locally secured through passkeys for human access and generated private keys for machine access"
+homepage = "https://secretpass.cloud"
+
+[package]
+name = "secretpass-core"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+description = { workspace = true }
+homepage = { workspace = true }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
 
 [lib]
 # This library is used in cli and also as part of the cloud for on device encryption and decryption

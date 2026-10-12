@@ -1,11 +1,11 @@
 [package]
 name = "secretpass-cli"
-version = "0.1.0"
-edition = "2024"
-repository = "https://github.com/secretpass/core"
-authors = ["Secretpass Inc", "Billcountry Mwaniki"]
-description = "Secretpass cli allows you to manage secrets locally secured through passkeys for human access and generated private keys for machine access"
-homepage = "https://secretpass.cloud"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+description = { workspace = true }
+homepage = { workspace = true }
 
 [[bin]]
 name = "spass"
