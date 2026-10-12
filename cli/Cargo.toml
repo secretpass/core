@@ -3,6 +3,9 @@ name = "secretpass-cli"
 version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/secretpass/core"
+authors = ["Secretpass Inc", "Billcountry Mwaniki"]
+description = "Secretpass cli allows you to manage secrets locally secured through passkeys for human access and generated private keys for machine access"
+homepage = "https://secretpass.cloud"
 
 [[bin]]
 name = "spass"
@@ -10,6 +13,12 @@ path = "src/main.rs"
 
 [package.metadata.dist]
 dist = true
+
+[package.metadata.wix]
+upgrade-guid = "B1BF63D8-5598-4B6A-B5EF-55CCCBBEAC79"
+path-guid = "53E1D4CC-047F-4AE9-BB70-9413537C74E8"
+license = false
+eula = false
 
 [dependencies]
 anyhow = "1.0.104"
