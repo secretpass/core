@@ -23,3 +23,8 @@ strum = { version = "0.28.0", features = ["derive", "strum_macros"] }
 tsify = { version = "0.5.8", features = ["wasm-bindgen"] }
 wasm-bindgen = { version = "0.2.128" }
 x25519-dalek = { version = "3.0.0", features = ["static_secrets"] }
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

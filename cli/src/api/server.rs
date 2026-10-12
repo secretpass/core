@@ -9,22 +9,28 @@ use axum::extract::Request;
 use axum::http::HeaderValue;
 use axum::middleware;
 use axum::response::Response;
+use axum_embed::ServeEmbed;
+use port_check::free_local_ipv4_port_in_range;
+use rust_embed::RustEmbed;
+
+#[derive(Debug, Clone, RustEmbed)]
+#[folder = "ui/dist/"]
+struct WebAssets;
 
 pub async fn serve_local_server(cloud: bool, cloud_origin: String, no_support: bool) {
+    let serve_assets = ServeEmbed::<WebAssets>::new();
+
     let app = Router::new()
         .merge(project_routes())
         .merge(user_routes())
         .merge(secrets_routes())
         .merge(command_run_routes())
         .merge(support_routes(no_support))
-        .layer(middleware::from_fn(add_dir_header));
+        .layer(middleware::from_fn(add_dir_header))
+        .fallback_service(serve_assets);
 
-    // Run the API on port 5000 proxied by vite while in debug mode
-    let address = if cfg!(debug_assertions) {
-        "secretpass.localhost:5000"
-    } else {
-        "secretpass.localhost:0"
-    };
+    let port = get_port();
+    let address = format!("secretpass.localhost:{}", port);
 
     let listener = tokio::net::TcpListener::bind(address).await.unwrap();
 
@@ -64,4 +70,8 @@ async fn add_dir_header(req: Request, next: middleware::Next) -> Response {
     );
 
     response
+}
+
+fn get_port() -> u16 {
+    free_local_ipv4_port_in_range(20206..20406).unwrap_or(0)
 }

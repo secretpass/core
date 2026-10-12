@@ -3,14 +3,21 @@ name = "secretpass-cli"
 version = "0.1.0"
 edition = "2024"
 
+
+[package.metadata.dist]
+dist = true
+
 [dependencies]
 anyhow = "1.0.104"
 axum = { version = "0.8.9", features = ["macros"] }
+axum-embed = "0.1.0"
 chrono = "0.4.45"
 clap = { version = "4.6.6", features = ["derive"] }
 home = "0.5.12"
 nix = { version = "0.31.3", features = ["signal"] }
+port_check = "0.3.0"
 processkit = { version = "3.3.4", features = [] }
+rust-embed = "8.13.0"
 secretpass-core = { path = ".." }
 serde = { version = "1.0.229" }
 yaml_serde = "0.10.7"
