@@ -48,3 +48,6 @@ x25519-dalek = { version = "3.0.0", features = ["static_secrets"] }
 inherits = "release"
 lto = "thin"
 
+[package.metadata.dist]
+dist = false
+

@@ -63,5 +63,4 @@ features = [
 dwarf-debug-info = true
 
 [package.metadata.dist]
-# Restrict this package to ONLY build for WASM
-targets = ["wasm32-unknown-unknown"]
+dist = false
