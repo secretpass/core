@@ -3,12 +3,6 @@
   run: |
     echo "RUSTFLAGS=--cfg web_sys_unstable_apis" >> $GITHUB_ENV
 
-- name: Export Rust Flags Win ARM
-  if: ${{ matrix.container.image == 'messense/cargo-xwin' }}
-  run: |
-    echo "RUSTFLAGS=--cfg web_sys_unstable_apis -C linker-flavor=wasm-lld" >> $GITHUB_ENV
-
-
 - name: Export Rust Flags on Win X86
   if: ${{ matrix.host == 'x86_64-pc-windows-msvc' }}
   run: |

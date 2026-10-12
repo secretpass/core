@@ -3,7 +3,7 @@ use crate::command::logger::Logger;
 use crate::project::{get_working_directory, short_path};
 use secretpass_core::{CommandInstanceDetails, CommandStatus, LogItem, LogSource};
 use std::collections::HashMap;
-use std::os::unix::process::CommandExt;
+
 use std::path::PathBuf;
 use std::process::Command as StdCommand;
 use std::sync::{Arc, Mutex};
@@ -154,6 +154,8 @@ impl CommandInstance {
 
         #[cfg(unix)]
         {
+            use std::os::unix::process::CommandExt;
+
             let error = command.exec();
             panic!("Failed to start the command: {:?}", error);
         }
@@ -173,7 +175,7 @@ impl CommandInstance {
                 }
             };
 
-            exit(exit_status.code().unwrap_or(0));
+            std::process::exit(exit_status.code().unwrap_or(0));
         }
     }
 
@@ -222,14 +224,14 @@ impl CommandInstance {
             return Ok(());
         }
 
-        let pid = process
-            .id()
-            .ok_or_else(|| anyhow::anyhow!("Process ID not available"))?;
-
         #[cfg(unix)]
         {
             use nix::sys::signal::{Signal, kill};
             use nix::unistd::Pid;
+
+            let pid = process
+                .id()
+                .ok_or_else(|| anyhow::anyhow!("Process ID not available"))?;
 
             let nix_pid = Pid::from_raw(pid as i32);
             kill(nix_pid, Signal::SIGTERM)?;
