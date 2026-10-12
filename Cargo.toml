@@ -7,7 +7,7 @@ resolver = "2"
 
 [package]
 name = "secretpass-core"
-version = "0.1.0"
+version = "0.1.0-prerelease-1"
 edition = "2024"
 
 [lib]

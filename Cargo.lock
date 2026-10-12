@@ -1719,7 +1719,7 @@ dependencies = [
 
 [[package]]
 name = "secretpass-core"
-version = "0.1.0"
+version = "0.1.0-prerelease-1"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2301,7 +2301,7 @@ dependencies = [
 
 [[package]]
 name = "web"
-version = "0.1.0"
+version = "0.1.0-prerelease-1"
 dependencies = [
  "anyhow",
  "chrono",

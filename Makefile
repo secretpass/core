@@ -2,7 +2,7 @@
 # Packaging make file
 # ==============================================================================
 
-.PHONY: all dev sandbox clean help
+.PHONY: all
 
 # Default target when running `make`
 all: help
@@ -10,38 +10,20 @@ all: help
 # Shared configuration
 WASM_TARGET    ?= web
 
-# ------------------------------------------------------------------------------
-# Web Library Local Build
-# ------------------------------------------------------------------------------
+
 web-local:
-	@echo "==> Building WASM for cli server usage"
-	cd web && \
-	WEBAUTH_RP_ID="secretpass.localhost" \
-	WEBAUTH_RP_ORIGIN="http://secretpass.localhost" \
-	WEBAUTH_RP_ENTITY="Secretpass Local" \
-	RUSTFLAGS='--cfg web_sys_unstable_apis' \
-	wasm-pack build \
-		--target $(WASM_TARGET) \
-		--release \
-		--no-pack \
-		--out-dir ../cli/ui/src/core
+	$(MAKE) -C ./web local
 
-
-# ------------------------------------------------------------------------------
-# Web Library Cloud Build
-# ------------------------------------------------------------------------------
 web-cloud:
-	@echo "==> Building WASM for cli server usage"
-	cd web && \
-	WEBAUTH_RP_ID="secretpass.cloud" \
-	WEBAUTH_RP_ORIGIN="https://secretpass.cloud" \
-	WEBAUTH_RP_ENTITY="Secretpass Cloud" \
-	RUSTFLAGS='--cfg web_sys_unstable_apis' \
-	wasm-pack build \
-		--target $(WASM_TARGET) \
-		--release \
-		--scope secretpass
+	$(MAKE) -C ./web cloud
 
+ui-install:
+	$(MAKE) -C ./cli/ui install
+
+ui-build:
+	$(MAKE) -C ./cli/ui build
+
+bundle: web-local ui-install ui-build
 
 cli:
 	@echo "==> Building cli app"
