@@ -22,4 +22,4 @@ publish-jobs = ["homebrew"]
 # Whether to install an updater program
 install-updater = true
 # Points cargo-dist to the custom setup steps file
-github-build-setup = "build-setup.yaml"
+github-build-setup = "setup/build-setup.yaml"
