@@ -1,5 +1,6 @@
 import { Button, Dropdown, IconChevronDown, Link } from "@heroui/react";
 import {
+  IconBook,
   IconBook2,
   IconBrandDiscord,
   IconBrandGithub,
@@ -16,33 +17,39 @@ import {
 import { type ReactNode, useState } from "react";
 import { Logo } from "@/components";
 import { ThemeToggle } from "@/features/theme/theme-toggle";
+import { useAnalytics } from "../analytics/provider";
 
 interface LinkItemProps {
   label: string;
   Icon: TablerIcon;
   href: string;
+  capture: string;
 }
 
 const community_links: LinkItemProps[] = [
   {
     label: "Slack",
     Icon: IconBrandSlack,
-    href: "https://slack.com",
+    href: "https://secretpass.cloud/l/s/slack",
+    capture: "social-interest-slack",
   },
   {
     label: "Github",
     Icon: IconBrandGithub,
-    href: "https://github.com",
+    href: "https://secretpass.cloud/l/s/github",
+    capture: "social-interest-github",
   },
   {
     label: "Reddit",
     Icon: IconBrandReddit,
-    href: "https://reddit.com",
+    href: "https://secretpass.cloud/l/s/reddit",
+    capture: "social-interest-reddit",
   },
   {
     label: "Discord",
     Icon: IconBrandDiscord,
-    href: "https://discord.com",
+    href: "https://secretpass.cloud/l/s/discord",
+    capture: "social-interest-discord",
   },
 ];
 
@@ -50,12 +57,20 @@ const resources_links: LinkItemProps[] = [
   {
     label: "Docs",
     Icon: IconBook2,
-    href: "https://secretpass.cloud/docs",
+    href: "https://secretpass.cloud/l/docs",
+    capture: "resource-interest-docs",
   },
   {
     label: "Blog",
     Icon: IconBrandMedium,
-    href: "https://medium.com/secretpass",
+    href: "https://secretpass.cloud/l/blog",
+    capture: "resource-interest-blog",
+  },
+  {
+    label: "Knowledge Base",
+    Icon: IconBook,
+    href: "https://secretpass.cloud/l/kb",
+    capture: "resource-interest-kb",
   },
 ];
 
@@ -79,19 +94,9 @@ export function Navbar() {
             <LinkDropDown items={community_links} label="Community" />
             <LinkDropDown items={resources_links} label="Resources" />
 
+            <CloudButton />
             <div className="flex items-center gap-4 border-l pl-4">
               <ThemeToggle />
-              <Link
-                href="https://secretpass.cloud"
-                target="_blank"
-                className="no-underline"
-              >
-                <Button size="sm">
-                  <IconCloudFilled className="size-4" />
-                  Cloud
-                  <IconExternalLink className="size-4" />
-                </Button>
-              </Link>
             </div>
           </nav>
 
@@ -110,18 +115,19 @@ export function Navbar() {
         {isOpen && (
           <div className="md:hidden border-t px-4 bg-background">
             <div className="container py-4 flex flex-col gap-4">
-              <Link
-                href="/docs"
-                className="text-sm flex items-center font-medium hover:text-primary transition-colors"
-                onClick={() => setIsOpen(false)}
-              >
-                <IconExternalLink className="size-4" />
-                Docs
-              </Link>
+              <LinkDropDown
+                items={community_links}
+                onClick={toggleMenu}
+                label="Community"
+              />
+              <LinkDropDown
+                items={resources_links}
+                onClick={toggleMenu}
+                label="Resources"
+              />
+
               <div className="border-t pt-4">
-                <Button className="w-full">
-                  <Link href="/login">Sign In</Link>
-                </Button>
+                <CloudButton />
               </div>
             </div>
           </div>
@@ -131,25 +137,50 @@ export function Navbar() {
   );
 }
 
+function CloudButton() {
+  return (
+    <Link
+      href="https://secretpass.cloud"
+      target="_blank"
+      className="no-underline"
+    >
+      <Button size="sm">
+        <IconCloudFilled className="size-4" />
+        Cloud
+        <IconExternalLink className="size-4" />
+      </Button>
+    </Link>
+  );
+}
+
 function LinkDropDown({
   items,
   label,
+  onClick,
 }: {
   items: LinkItemProps[];
   label: ReactNode;
+  onClick?: () => void;
 }) {
+  const analytics = useAnalytics();
   return (
     <Dropdown>
       <Dropdown.Trigger>
-        <Button variant="ghost">
+        <div className="button button--md button--ghost w-full md:w-auto justify-start">
           {label}
           <IconChevronDown />
-        </Button>
+        </div>
       </Dropdown.Trigger>
       <Dropdown.Popover>
         <Dropdown.Menu>
           {items.map((item) => (
             <Dropdown.Item
+              onClick={() => {
+                onClick?.();
+                if (item.capture) {
+                  analytics?.capture(item.capture);
+                }
+              }}
               className="flex items-center gap-2"
               key={item.href}
               href={item.href}

@@ -11,7 +11,14 @@
   "environments": [
     {
       "name": "development",
-      "description": "For testing by developers before moving to QC"
+      "description": "For testing by developers before moving to QC",
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "data_type": "Text",
+          "description": "You can now secure your database url"
+        }
+      ]
     },
     {
       "name": "staging",
@@ -19,7 +26,14 @@
     },
     {
       "name": "production",
-      "description": "Prod secrets, heavily restricted"
+      "description": "Prod secrets, heavily restricted",
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "data_type": "Text",
+          "description": "Separate environments for your needs"
+        }
+      ]
     },
     {
       "name": "local",
